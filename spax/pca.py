@@ -11,7 +11,7 @@ class PCA():
     For environment with 1 GPU, if data and computations can fit on a GPU, use as is.
     For general CPU + GPU environment, put the following at the beginning of your code:
     ```
-    impor jax
+    import jax
     jax.config.update('jax_platform_name', 'cpu')
     ```
     and pass `jax.devices("gpu")` as devices.
@@ -57,7 +57,7 @@ class PCA():
         `data.shape == (N_dim, N_samples)`
         '''
         data = data.astype(np.float32)
-        if devices is None:
+        if self.devices is None:
             self._fit(data)
         else:
             batch_size = data.shape[0] if batch_size is None else batch_size
