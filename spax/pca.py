@@ -87,5 +87,5 @@ class PCA():
         '''
         Sample from the Gaussian prior and compute the inverse_transofrm of pulled samples.
         '''
-        X_t = np.random.normal(size = (self.N, n)) * np.array(self.λ)[:, np.newaxis]
+        X_t = np.random.normal(size = (self.N, n)) * np.sqrt(np.array(self.λ)[:, np.newaxis])
         return self.inverse_transform(X_t)
