@@ -4,7 +4,7 @@ import numpy as np
 import spax
 
 pca = spax.PCA(5, devices = jax.devices("gpu"))
-data = np.random.normal(0, 1, size = (100, 1000)) * np.arange(1, 101)
+data = np.random.normal(0, 1, size = (100, 1000)) * np.arange(1, 101)[:, np.newaxis]
 
 pca.fit(data, batch_size = 10) # N_dims % batch_size == 0
 sampled_data = pca.sample(1000)
