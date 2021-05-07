@@ -11,3 +11,4 @@ pca.fit(data, batch_size = 2) # N_dim % batch_size == 0
 sampled_data = pca.sample(100000)
 print(np.std(pca.transform(sampled_data), axis = 1, ddof = 1)**2) # should be [6, 7, 8, 9, 10]
 print(pca.λ) # should be the same
+print(np.round(pca.v.T, 1)) # should be unit matrix on last 5 dimensions
