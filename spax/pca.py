@@ -25,8 +25,8 @@ class PCA():
         self.μ = jnp.mean(data, axis = 1, keepdims = True, dtype = jnp.float64).astype(jnp.float32)
         Σ = jnp.cov(data)
         self.λ, self.v = jnp.linalg.eigh(Σ)
-        self.λ = self.λ[:self.N]
-        self.v = self.v[:, :self.N]
+        self.λ = self.λ[-self.N::-1]
+        self.v = self.v[:, -self.N::-1]
 
     def _fit_pmap(self, data, batch_size):
         @partial(jax.pmap, in_axes = (0, 0, None, None), devices = self.devices, backend = "gpu")
@@ -48,8 +48,8 @@ class PCA():
 
         Σ = jnp.concatenate([jnp.concatenate(cov(d_y, μ_y, d_xi, μ_xi), axis = 1) for d_xi, μ_xi in zip(d_x, μ_x)], axis = 0)
         self.λ, self.v = jnp.linalg.eigh(Σ)
-        self.λ = self.λ[:self.N]
-        self.v = self.v[:, :self.N]
+        self.λ = self.λ[-self.N::-1]
+        self.v = self.v[:, -self.N::-1]
         
     def fit(self, data, batch_size = None):
         '''
