@@ -23,7 +23,7 @@ class PCA():
     
     def _fit(self, data):
         self.μ = jnp.mean(data, axis = 1, keepdims = True, dtype = jnp.float64).astype(jnp.float32)
-        Σ = jnp.cov(data.T)
+        Σ = jnp.cov(data)
         self.λ, self.v = jnp.linalg.eigh(Σ)
         self.λ = self.λ[:self.N]
         self.v = self.v[:, :self.N]
@@ -32,10 +32,8 @@ class PCA():
         @partial(jax.pmap, in_axes = (0, 0, None, None), devices = self.devices, backend = "gpu")
         @jax.jit
         def cov(y, μ_y, x, μ_x):
-            n_x = x.shape[-1]
-            n_y = y.shape[-1]
-            norm = jnp.sqrt((n_x - 1) * (n_y - 1))
-            return (x - μ_x) @ (y - μ_y).T / norm
+            n = x.shape[-1]
+            return (x - μ_x) @ (y - μ_y).T / (n - 1)
 
         N_dim, N_samples = data.shape
         d_y = data.reshape(self.n_d, N_dim // self.n_d, N_samples)
