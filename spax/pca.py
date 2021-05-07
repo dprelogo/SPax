@@ -41,7 +41,9 @@ class PCA():
         d_y = data.reshape(self.n_d, N_dim // self.n_d, N_samples)
         d_x = data.reshape(N_dim // batch_size, batch_size, N_samples)
 
-        partial_mean = jax.pmap(partial(jnp.mean, axis = 1, keepdims = True, dtype = jnp.float64))
+        partial_mean = jax.pmap(
+            partial(jnp.mean, axis = 1, keepdims = True, dtype = jnp.float64), 
+            devices = self.devices, backend = "gpu")
         self.μ = jnp.concatenate(partial_mean(d_y), axis = 0).astype(jnp.float32)
         μ_y = self.μ.reshape(self.n_d, N_dim // self.n_d, 1)
         μ_x = self.μ.reshape(N_dim // batch_size, batch_size, 1)
