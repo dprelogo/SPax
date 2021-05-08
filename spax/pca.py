@@ -67,7 +67,9 @@ class PCA():
 
         Args:
             data: data to fit on of shape `(N_dim, N_samples)`.
-            batch_size: batch size for covariance
+            batch_size: splitting covariance matrix calculation in chunks of `(N_dim / n_devices, batch_size)`. 
+                Take care such matrix (+ data) can fit on one device. Bigger the better.
+                `N_dim % batch_size == 0`, defaults to `N_dim`. Ignored if devices are not set.
 
         Returns:
             `None`
@@ -77,6 +79,8 @@ class PCA():
             self._fit(data)
         else:
             batch_size = data.shape[0] if batch_size is None else batch_size
+            if data.shape[0] % batch_size != 0:
+                raise ValueError("N_dim of the data should be divisible by the batch_size.")
             self._fit_pmap(data, batch_size)
 
     def transform(self, X):
