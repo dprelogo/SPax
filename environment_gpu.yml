@@ -1,4 +1,4 @@
-name: SPax
+name: SPax_gpu
 channels:
   - defaults
 dependencies:
@@ -6,5 +6,5 @@ dependencies:
   - pip
   - numpy
   - pip:
-    - jax -f https://storage.googleapis.com/jax-releases/jax_releases.html
-    - jaxlib==0.1.65+cuda110 -f https://storage.googleapis.com/jax-releases/jax_releases.html
+    - jax
+    - https://storage.googleapis.com/jax-releases/cuda110/jaxlib-0.1.65+cuda110-cp38-none-manylinux2010_x86_64.whl
