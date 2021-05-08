@@ -8,3 +8,4 @@ dependencies:
   - pip:
     - jax
     - jaxlib
+    - pylint
