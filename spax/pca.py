@@ -68,7 +68,7 @@ class PCA():
         Args:
             data: data to fit on of shape `(N_dim, N_samples)`.
             batch_size: splitting covariance matrix calculation in chunks of `(N_dim / n_devices, batch_size)`. 
-                Take care such matrix (+ data) can fit on one device. Bigger the better.
+                Take care such matrix (+ data) can fit on one device. However bigger is better.
                 `N_dim % batch_size == 0`, defaults to `N_dim`. Ignored if devices are not set.
 
         Returns:
