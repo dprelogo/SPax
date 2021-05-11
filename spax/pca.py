@@ -146,9 +146,9 @@ class PCA_m():
 
         data = data.astype(np.float32).reshape(N_dim // (n_d * batch_size), n_d, batch_size, N_samples)
 
-        @partial(jax.pmap, in_axes = (0, None), devices = self.devices, backend = "gpu")
-        @partial(jax.jit, static_argnums=(1,))
-        def data_transform(d_part, whiten):
+        @partial(jax.pmap, devices = self.devices, backend = "gpu")
+        @jax.jit
+        def data_transform(d_part):
             μ_part = jnp.mean(d_part, axis = 1, keepdims = True, dtype = jnp.float64).astype(jnp.float32)
             if whiten:
                 σ_part = jnp.std(d_part, axis = 1, keepdims = True, dtype = jnp.float64).astype(jnp.float32)
@@ -160,7 +160,7 @@ class PCA_m():
 
         μ, σ = [], []
         for i, d in enumerate(data):
-            d_part, μ_part, σ_part = data_transform(d, whiten)
+            d_part, μ_part, σ_part = data_transform(d)
             d[i] = np.array(d_part, dtype = np.float32)
             μ.append(jnp.array(μ_part, dtype = jnp.float32))
             σ.append(jnp.array(σ_part, dtype = jnp.float32))
