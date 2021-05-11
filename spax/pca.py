@@ -214,7 +214,7 @@ class PCA_m():
             X_t: transformed data of shape `(N, N_samples)`.
         '''
         X = X.astype(np.float32)
-        X_t = jnp.einsum("ji,jk->ik", self.U, (X - self.μ[:jnp.newaxis]) / self.σ[:, jnp.newaxis])
+        X_t = jnp.einsum("ji,jk->ik", self.U, (X - self.μ[:, jnp.newaxis]) / self.σ[:, jnp.newaxis])
         return np.array(X_t, dtype = np.float32)
 
     def inverse_transform(self, X_t):
