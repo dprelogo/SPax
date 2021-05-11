@@ -142,7 +142,7 @@ class PCA_m():
         N_dim, N_samples = data.shape
         batch_size = N_dim // n_d if batch_size is None else batch_size
         if N_dim % (n_d * batch_size) != 0:
-            raise ValueError("N_dim of the data should be divisible by the batch_size.")
+            raise ValueError("N_dim of the data should be divisible by the n_devices * batch_size.")
 
         data = data.astype(np.float32).reshape(N_dim // (n_d * batch_size), n_d, batch_size, N_samples)
 
