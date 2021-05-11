@@ -164,8 +164,8 @@ class PCA_m():
             data[i] = np.array(d_part, dtype = np.float32)
             μ.append(jnp.array(μ_part, dtype = jnp.float32))
             σ.append(jnp.array(σ_part, dtype = jnp.float32))
-        self.μ = jnp.flatten(jnp.array(μ, dtype = jnp.float32))
-        self.σ = jnp.flatten(jnp.array(σ, dtype = jnp.float32))
+        self.μ = jnp.array(μ, dtype = jnp.float32).flatten()
+        self.σ = jnp.array(σ, dtype = jnp.float32).flatten()
 
         if N_dim <= N_samples:
             @partial(jax.pmap, in_axes = (0, None), devices = self.devices, backend = "gpu")
