@@ -67,7 +67,7 @@ class PCA():
         '''
         #self.v.T == R, self.v == R^{-1}, where R is a rotation matrix.
         X = X.astype(np.float32)
-        X_t = jnp.einsum("ji,jk->ik", self.U, (X - self.μ) / self.σ)
+        X_t = jnp.einsum("ji,jk->ik", self.U, (X - self.μ[:, jnp.newaxis]) / self.σ[:, jnp.newaxis])
         return np.array(X_t, dtype = np.float32)
 
     def inverse_transform(self, X_t):
@@ -80,7 +80,7 @@ class PCA():
             X: transformed data in original space, of shape `(N_dim, N_samples)`.
         '''
         X_t = X_t.astype(np.float32)
-        X = jnp.einsum("ij,jk->ik", self.U, X_t) * self.σ + self.μ
+        X = jnp.einsum("ij,jk->ik", self.U, X_t) * self.σ[:, jnp.newaxis] + self.μ[:, jnp.newaxis]
         return np.array(X, dtype = np.float32)
 
     def sample(self, n = 1):
@@ -214,7 +214,7 @@ class PCA_m():
             X_t: transformed data of shape `(N, N_samples)`.
         '''
         X = X.astype(np.float32)
-        X_t = jnp.einsum("ji,jk->ik", self.U, (X - self.μ) / self.σ)
+        X_t = jnp.einsum("ji,jk->ik", self.U, (X - self.μ[:jnp.newaxis]) / self.σ[:, jnp.newaxis])
         return np.array(X_t, dtype = np.float32)
 
     def inverse_transform(self, X_t):
@@ -227,7 +227,7 @@ class PCA_m():
             X: transformed data in original space, of shape `(N_dim, N_samples)`.
         '''
         X_t = X_t.astype(np.float32)
-        X = jnp.einsum("ij,jk->ik", self.U, X_t) * self.σ + self.μ
+        X = jnp.einsum("ij,jk->ik", self.U, X_t) * self.σ[:, jnp.newaxis] + self.μ[:jnp.newaxis]
         return np.array(X, dtype = np.float32)
 
     def sample(self, n = 1):
