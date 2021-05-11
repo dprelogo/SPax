@@ -131,7 +131,7 @@ class PCA_m():
             data: data to fit on of shape `(N_dim, N_samples)`.
             batch_size: splitting calculation in data chunks of `(N_dim / n_devices / batch_size, N_samples)`. 
                 Take care such matrix (+ data) can fit on one device.
-                `N_min % (N_devices * batch_size) == 0`, defaults to `N_dim / n_devices`.
+                `N_dim % (N_devices * batch_size) == 0`, defaults to `N_dim / n_devices`.
             whiten (bool): scaling all dimensions to the unit variance.
 
         Returns:
