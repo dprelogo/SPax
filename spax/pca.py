@@ -227,7 +227,7 @@ class PCA_m():
             X: transformed data in original space, of shape `(N_dim, N_samples)`.
         '''
         X_t = X_t.astype(np.float32)
-        X = jnp.einsum("ij,jk->ik", self.U, X_t) * self.σ[:, jnp.newaxis] + self.μ[:jnp.newaxis]
+        X = jnp.einsum("ij,jk->ik", self.U, X_t) * self.σ[:, jnp.newaxis] + self.μ[:, jnp.newaxis]
         return np.array(X, dtype = np.float32)
 
     def sample(self, n = 1):
