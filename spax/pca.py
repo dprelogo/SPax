@@ -111,7 +111,6 @@ class PCA_m():
     Attributes:
         N: number of principal components.
         devices: list of `jax.devices`.
-        device_memory: per-GPU memory in GB.
     
     Methods:
         fit: computing principal vectors.
@@ -121,35 +120,9 @@ class PCA_m():
             and computing inverse_transform.
 
     '''
-    def __init__(self, N, devices, device_memory):
+    def __init__(self, N, devices):
         self.N = N
         self.devices = devices
-        self.GPU_mem = device_memory
-    
-
-    def _fit_pmap(self, data, batch_size):
-        n_d = len(self.devices)
-        @partial(jax.pmap, in_axes = (0, 0, None, None), devices = self.devices, backend = "gpu")
-        @jax.jit
-        def cov(y, μ_y, x, μ_x):
-            n = x.shape[-1]
-            return (x - μ_x) @ (y - μ_y).T / (n - 1)
-
-        N_dim, N_samples = data.shape
-        d_y = data.reshape(n_d, N_dim // n_d, N_samples)
-        d_x = data.reshape(N_dim // batch_size, batch_size, N_samples)
-
-        partial_mean = jax.pmap(
-            partial(jnp.mean, axis = 1, keepdims = True, dtype = jnp.float64), 
-            devices = self.devices, backend = "gpu")
-        self.μ = jnp.concatenate(partial_mean(d_y), axis = 0).astype(jnp.float32)
-        μ_y = self.μ.reshape(n_d, N_dim // n_d, 1)
-        μ_x = self.μ.reshape(N_dim // batch_size, batch_size, 1)
-
-        Σ = jnp.concatenate([jnp.concatenate(cov(d_y, μ_y, d_xi, μ_xi), axis = 1) for d_xi, μ_xi in zip(d_x, μ_x)], axis = 0)
-        self.λ, self.v = jnp.linalg.eigh(Σ)
-        self.λ = self.λ[-self.N:]
-        self.v = self.v[:, -self.N:]
         
     def fit(self, data, batch_size = None, whiten = False):
         '''Computing eigenvectors and eigenvalues of the data.
