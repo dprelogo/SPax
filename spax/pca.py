@@ -67,7 +67,7 @@ class PCA():
         '''
         #self.v.T == R, self.v == R^{-1}, where R is a rotation matrix.
         X = X.astype(np.float32)
-        X_t = jnp.einsum("ji,jk->ik", self.U, (X - self.μ[:, jnp.newaxis]) / self.σ[:, jnp.newaxis])
+        X_t = jnp.einsum("ji,jk->ik", self.U, (X - self.μ) / self.σ)
         return np.array(X_t, dtype = np.float32)
 
     def inverse_transform(self, X_t):
@@ -80,7 +80,7 @@ class PCA():
             X: transformed data in original space, of shape `(N_dim, N_samples)`.
         '''
         X_t = X_t.astype(np.float32)
-        X = jnp.einsum("ij,jk->ik", self.U, X_t) * self.σ[:, jnp.newaxis] + self.μ[:, jnp.newaxis]
+        X = jnp.einsum("ij,jk->ik", self.U, X_t) * self.σ + self.μ
         return np.array(X, dtype = np.float32)
 
     def sample(self, n = 1):
@@ -158,14 +158,15 @@ class PCA_m():
                 d_part = d_part - μ_part
             return d_part, μ_part, σ_part
 
-        μ, σ = [], []
+        data_transformed, μ, σ = [], [], []
         for i, d in enumerate(data):
             d_part, μ_part, σ_part = data_transform(d)
-            data[i] = np.array(d_part, dtype = np.float32)
+            data_transformed.append(jnp.array(d_part, dtype = jnp.float32))
             μ.append(jnp.array(μ_part, dtype = jnp.float32))
             σ.append(jnp.array(σ_part, dtype = jnp.float32))
-        self.μ = jnp.array(μ, dtype = jnp.float32).flatten()
-        self.σ = jnp.array(σ, dtype = jnp.float32).flatten()
+        self.μ = jnp.array(μ, dtype = jnp.float32).flatten()[:, jnp.newaxis]
+        self.σ = jnp.array(σ, dtype = jnp.float32).flatten()[:, jnp.newaxis]
+        data = jnp.array(data_transformed, dtype = jnp.float32)
 
         if N_dim <= N_samples:
             @partial(jax.pmap, in_axes = (0, None), devices = self.devices, backend = "gpu")
@@ -214,7 +215,7 @@ class PCA_m():
             X_t: transformed data of shape `(N, N_samples)`.
         '''
         X = X.astype(np.float32)
-        X_t = jnp.einsum("ji,jk->ik", self.U, (X - self.μ[:, jnp.newaxis]) / self.σ[:, jnp.newaxis])
+        X_t = jnp.einsum("ji,jk->ik", self.U, (X - self.μ) / self.σ)
         return np.array(X_t, dtype = np.float32)
 
     def inverse_transform(self, X_t):
@@ -227,7 +228,7 @@ class PCA_m():
             X: transformed data in original space, of shape `(N_dim, N_samples)`.
         '''
         X_t = X_t.astype(np.float32)
-        X = jnp.einsum("ij,jk->ik", self.U, X_t) * self.σ[:, jnp.newaxis] + self.μ[:, jnp.newaxis]
+        X = jnp.einsum("ij,jk->ik", self.U, X_t) * self.σ + self.μ
         return np.array(X, dtype = np.float32)
 
     def sample(self, n = 1):
