@@ -147,7 +147,7 @@ class PCA_m():
         data = data.astype(np.float32).reshape(N_dim // (n_d * batch_size), n_d, batch_size, N_samples)
 
         @partial(jax.pmap, in_axes = (0, None), devices = self.devices, backend = "gpu")
-        @jax.jit
+        @partial(jax.jit, static_argnums=(1,))
         def data_transform(d_part, whiten):
             μ_part = jnp.mean(d_part, axis = 1, keepdims = True, dtype = jnp.float64).astype(jnp.float32)
             if whiten:
