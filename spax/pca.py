@@ -161,7 +161,7 @@ class PCA_m():
         μ, σ = [], []
         for i, d in enumerate(data):
             d_part, μ_part, σ_part = data_transform(d)
-            d[i] = np.array(d_part, dtype = np.float32)
+            data[i] = np.array(d_part, dtype = np.float32)
             μ.append(jnp.array(μ_part, dtype = jnp.float32))
             σ.append(jnp.array(σ_part, dtype = jnp.float32))
         self.μ = jnp.flatten(jnp.array(μ, dtype = jnp.float32))
