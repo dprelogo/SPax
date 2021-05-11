@@ -44,17 +44,17 @@ class PCA():
             self.σ = jnp.ones((N_dim, 1), dtype = jnp.float32)
 
         if N_dim <= N_samples:
-            C = (jnp.einsum("ik,jk->ij", data, data, dtype = jnp.float64) / (N_dim - 1)).astype(jnp.float32)
+            C = (jnp.einsum("ik,jk->ij", data, data, precision = jax.lax.Precision.HIGH) / (N_dim - 1)).astype(jnp.float32)
             self.λ, self.U = jnp.linalg.eigh(C)
             self.λ = jnp.sqrt(self.λ[-self.N:])
             self.U = self.U[:, -self.N:]
         else:
-            D = (jnp.einsum("ki,kj->ij", data, data, dtype = jnp.float64) / N_samples).astype(jnp.float32)
+            D = (jnp.einsum("ki,kj->ij", data, data, precision = jax.lax.Precision.HIGH) / N_samples).astype(jnp.float32)
             λ, V = jnp.linalg.eigh(D)
             self.λ = jnp.sqrt(λ[-self.N:]) * jnp.sqrt(N_samples / (N_dim - 1))
             S_inv = (1 / (jnp.sqrt(λ[-self.N:]) * jnp.sqrt(N_samples)))[jnp.newaxis, :]
             VS_inv = V[:, -self.N:] * S_inv
-            self.U = jnp.einsum("ij,jk->ik", data, VS_inv, dtype = jnp.float64).astype(jnp.float32)
+            self.U = jnp.einsum("ij,jk->ik", data, VS_inv, precision = jax.lax.Precision.HIGH).astype(jnp.float32)
 
     def transform(self, X):
         '''Transforming X and computing principal components for each sample.
@@ -171,7 +171,7 @@ class PCA_m():
             @partial(jax.pmap, in_axes = (0, None), devices = self.devices, backend = "gpu")
             @jax.jit
             def partial_C(d1, d2):
-                return (jnp.einsum("ik,jk->ij", d1, d2, dtype = jnp.float64) / (N_samples - 1)).astype(jnp.float32)
+                return (jnp.einsum("ik,jk->ij", d1, d2, precision = jax.lax.Precision.HIGH) / (N_samples - 1)).astype(jnp.float32)
             C = []
             for d_y in data.reshape(N_dim // batch_size, batch_size, N_samples):
                 row_C = []
@@ -189,7 +189,7 @@ class PCA_m():
             @partial(jax.pmap, in_axes = (0, 0), devices = self.devices, backend = "gpu")
             @jax.jit
             def partial_D(d1, d2):
-                return (jnp.einsum("ki,kj->ij", d1, d2, dtype = jnp.float64) / N_dim).astype(jnp.float32)
+                return (jnp.einsum("ki,kj->ij", d1, d2, precision = jax.lax.Precision.HIGH) / N_dim).astype(jnp.float32)
             D = jnp.sum(jnp.array([jnp.sum(partial_D(d1, d2), axis = 0) for d1, d2, in zip(data, data)]), axis = 0)
             D = jax.device_put(D, self.devices[0])
             λ, V = jnp.linalg.eigh(D)
@@ -200,7 +200,7 @@ class PCA_m():
             @partial(jax.jit, devices = self.devices, backend = "gpu")
             @jax.jit
             def partial_U(d):
-                return jnp.einsum("ij,jk->ik", d, VS_inv, dtype = jnp.float64).astype(jnp.float32)
+                return jnp.einsum("ij,jk->ik", d, VS_inv, precision = jax.lax.Precision.HIGH).astype(jnp.float32)
 
             self.U = jnp.concatenate([jnp.concatenate(partial_U(d)) for d in data], axis = 0)
 
