@@ -197,7 +197,7 @@ class PCA_m():
             S_inv = (1 / (jnp.sqrt(λ[-self.N:]) * jnp.sqrt(N_dim)))[jnp.newaxis, :]
             VS_inv = V[:, -self.N:] * S_inv
 
-            @partial(jax.jit, devices = self.devices, backend = "gpu")
+            @partial(jax.pmap, devices = self.devices, backend = "gpu")
             @jax.jit
             def partial_U(d):
                 return jnp.einsum("ij,jk->ik", d, VS_inv, precision = jax.lax.Precision.HIGH).astype(jnp.float32)
