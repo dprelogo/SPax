@@ -169,7 +169,7 @@ class PCA_m(PCA):
                 Take care such matrix (+ data) can fit on one device.
                 `N_dim % (N_devices * batch_size) == 0`, defaults to `N_dim / n_devices`.
             whiten (bool): scaling all dimensions to the unit variance.
-            centering_data (str): either "CPU" or "GPU", where to center the data.
+            centering_data (str): either "CPU" or "GPU", where to perform data centering/whitening.
 
         Returns:
             `None`
