@@ -179,29 +179,37 @@ class PCA_m(PCA):
         if N_dim % (n_d * batch_size) != 0:
             raise ValueError("N_dim of the data should be divisible by the n_devices * batch_size.")
 
-        data = data.astype(np.float32).reshape(N_dim // (n_d * batch_size), n_d, batch_size, N_samples)
+        # data = data.astype(np.float32).reshape(N_dim // (n_d * batch_size), n_d, batch_size, N_samples)
 
-        @partial(jax.pmap, devices = self.devices, backend = "gpu")
-        @jax.jit
-        def data_transform(d_part):
-            μ_part = jnp.mean(d_part, axis = 1, keepdims = True, dtype = jnp.float64).astype(jnp.float32)
-            if whiten:
-                σ_part = jnp.std(d_part, axis = 1, keepdims = True, dtype = jnp.float64).astype(jnp.float32)
-                d_part = (d_part - μ_part) / σ_part
-            else:
-                σ_part = jnp.ones(shape = μ_part.shape, dtype = jnp.float32)
-                d_part = d_part - μ_part
-            return d_part, μ_part, σ_part
+        # @partial(jax.pmap, devices = self.devices, backend = "gpu")
+        # @jax.jit
+        # def data_transform(d_part):
+        #     μ_part = jnp.mean(d_part, axis = 1, keepdims = True, dtype = jnp.float64).astype(jnp.float32)
+        #     if whiten:
+        #         σ_part = jnp.std(d_part, axis = 1, keepdims = True, dtype = jnp.float64).astype(jnp.float32)
+        #         d_part = (d_part - μ_part) / σ_part
+        #     else:
+        #         σ_part = jnp.ones(shape = μ_part.shape, dtype = jnp.float32)
+        #         d_part = d_part - μ_part
+        #     return d_part, μ_part, σ_part
 
-        data_transformed, μ, σ = [], [], []
-        for i, d in enumerate(data):
-            d_part, μ_part, σ_part = data_transform(d)
-            data_transformed.append(jnp.array(d_part, dtype = jnp.float32))
-            μ.append(jnp.array(μ_part, dtype = jnp.float32))
-            σ.append(jnp.array(σ_part, dtype = jnp.float32))
-        self.μ = jnp.array(μ, dtype = jnp.float32).flatten()[:, jnp.newaxis]
-        self.σ = jnp.array(σ, dtype = jnp.float32).flatten()[:, jnp.newaxis]
-        data = jnp.array(data_transformed, dtype = jnp.float32)
+        # data_transformed, μ, σ = [], [], []
+        # for i, d in enumerate(data):
+        #     d_part, μ_part, σ_part = data_transform(d)
+        #     data_transformed.append(jnp.array(d_part, dtype = jnp.float32))
+        #     μ.append(jnp.array(μ_part, dtype = jnp.float32))
+        #     σ.append(jnp.array(σ_part, dtype = jnp.float32))
+        # self.μ = jnp.array(μ, dtype = jnp.float32).flatten()[:, jnp.newaxis]
+        # self.σ = jnp.array(σ, dtype = jnp.float32).flatten()[:, jnp.newaxis]
+        # data = jnp.array(data_transformed, dtype = jnp.float32)
+        data = jnp.array(data, dtype = jnp.float32)
+        self.μ = jnp.mean(data, axis = 1, keepdims = True)
+        if whiten:
+            self.σ = jnp.std(data, axis = 1, keepdims = True)
+        else:
+            self.σ = jnp.ones(shape = self.μ, dtype = np.float32)
+        data = (data - self.μ) / self.σ
+        data = data.reshape(N_dim // (n_d * batch_size), n_d, batch_size, N_samples)
 
         if N_dim <= N_samples:
             @partial(jax.pmap, in_axes = (0, None), devices = self.devices, backend = "gpu")
