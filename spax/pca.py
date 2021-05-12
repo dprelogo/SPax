@@ -19,7 +19,6 @@ class PCA():
         inverse_transform: inverse of the transform.
         sample: sampling multivariate gaussian distribution of the principal components
             and computing inverse_transform.
-
     '''
     def __init__(self, N):
         self.N = N
@@ -34,15 +33,15 @@ class PCA():
         Returns:
             `None`
         '''
-        data = data.astype(np.float32)
+        data = jnp.array(data, dtype = jnp.float32)
         N_dim, N_samples = data.shape
         self.μ = jnp.mean(data, axis = 1, keepdims = True, dtype = jnp.float64).astype(jnp.float32)
-        data -= self.μ
         if whiten:
             self.σ = jnp.std(data, axis = 1, keepdims = True, dtype = jnp.float64).astype(jnp.float32)
-            data /= self.σ
         else:
             self.σ = jnp.ones((N_dim, 1), dtype = jnp.float32)
+
+        data = (data - self.μ) / self.σ
 
         if N_dim <= N_samples:
             C = (jnp.einsum("ik,jk->ij", data, data, precision = jax.lax.Precision.HIGH) / (N_dim - 1)).astype(jnp.float32)
@@ -67,7 +66,7 @@ class PCA():
             X_t: transformed data of shape `(N, N_samples)`.
         '''
         #self.v.T == R, self.v == R^{-1}, where R is a rotation matrix.
-        X = X.astype(np.float32)
+        X = jnp.array(X, dtype = jnp.float32)
         X_t = jnp.einsum("ji,jk->ik", self.U, (X - self.μ) / self.σ)
         return np.array(X_t, dtype = np.float32)
 
@@ -80,7 +79,7 @@ class PCA():
         Returns:
             X: transformed data in original space, of shape `(N_dim, N_samples)`.
         '''
-        X_t = X_t.astype(np.float32)
+        X_t = jnp.array(X_t, dtype = jnp.float32)
         X = jnp.einsum("ij,jk->ik", self.U, X_t) * self.σ + self.μ
         return np.array(X, dtype = np.float32)
 
@@ -156,7 +155,6 @@ class PCA_m(PCA):
         inverse_transform: inverse of the transform.
         sample: sampling multivariate gaussian distribution of the principal components
             and computing inverse_transform.
-
     '''
     def __init__(self, N, devices):
         super().__init__(N)
@@ -175,14 +173,13 @@ class PCA_m(PCA):
         Returns:
             `None`
         '''
-
         n_d = len(self.devices)
         N_dim, N_samples = data.shape
         batch_size = N_dim // n_d if batch_size is None else batch_size
         if N_dim % (n_d * batch_size) != 0:
             raise ValueError("N_dim of the data should be divisible by the n_devices * batch_size.")
 
-        data = data.astype(np.float32).reshape(N_dim // (n_d * batch_size), n_d, batch_size, N_samples)
+        data = jnp.array(data, dtype = jnp.float32).reshape(N_dim // (n_d * batch_size), n_d, batch_size, N_samples)
 
         @partial(jax.pmap, devices = self.devices, backend = "gpu")
         @jax.jit
