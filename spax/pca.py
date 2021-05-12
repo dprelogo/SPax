@@ -207,7 +207,7 @@ class PCA_m(PCA):
         if whiten:
             self.σ = jnp.std(data, axis = 1, keepdims = True)
         else:
-            self.σ = jnp.ones(shape = self.μ, dtype = np.float32)
+            self.σ = jnp.ones(shape = self.μ.shape, dtype = np.float32)
         data = (data - self.μ) / self.σ
         data = data.reshape(N_dim // (n_d * batch_size), n_d, batch_size, N_samples)
 
