@@ -182,9 +182,9 @@ class PCA_m(PCA):
 
         if centering_data == "CPU":
             data = data.astype(np.float32)
-            self.μ = jnp.mean(data, axis = 1, keepdims = True)
+            self.μ = jnp.mean(data, axis = 1, keepdims = True, dtype = jnp.float64).astype(jnp.float32)
             if whiten:
-                self.σ = jnp.std(data, axis = 1, keepdims = True)
+                self.σ = jnp.std(data, axis = 1, keepdims = True, dtype = jnp.float64).astype(jnp.float32)
             else:
                 self.σ = jnp.ones(shape = self.μ.shape, dtype = np.float32)
             data = (data - self.μ) / self.σ
