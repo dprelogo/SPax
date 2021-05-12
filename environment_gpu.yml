@@ -1,10 +1,12 @@
 name: SPax_gpu
 channels:
   - defaults
+  - conda-forge
 dependencies:
   - python=3.8
   - pip
   - numpy
+  - h5py
   - pip:
     - jax
     - https://storage.googleapis.com/jax-releases/cuda110/jaxlib-0.1.65+cuda110-cp38-none-manylinux2010_x86_64.whl
