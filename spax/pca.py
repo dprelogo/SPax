@@ -204,7 +204,7 @@ class PCA_m(PCA):
                 return d_part, μ_part, σ_part
 
             data_transformed, μ, σ = [], [], []
-            for i, d in enumerate(data):
+            for d in data:
                 d_part, μ_part, σ_part = data_transform(d)
                 data_transformed.append(jnp.array(d_part, dtype = jnp.float32))
                 μ.append(jnp.array(μ_part, dtype = jnp.float32))
