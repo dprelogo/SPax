@@ -179,7 +179,7 @@ class PCA_m(PCA):
         if N_dim % (n_d * batch_size) != 0:
             raise ValueError("N_dim of the data should be divisible by the n_devices * batch_size.")
 
-        data = jnp.array(data, dtype = jnp.float32).reshape(N_dim // (n_d * batch_size), n_d, batch_size, N_samples)
+        data = data.astype(np.float32).reshape(N_dim // (n_d * batch_size), n_d, batch_size, N_samples)
 
         @partial(jax.pmap, devices = self.devices, backend = "gpu")
         @jax.jit
