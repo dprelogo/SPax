@@ -48,6 +48,9 @@ class PCA():
             self.λ, self.U = jnp.linalg.eigh(C)
             self.λ = jnp.sqrt(self.λ[-self.N:])
             self.U = self.U[:, -self.N:]
+
+            self.U = self.U[:, ::-1]
+            self.λ = self.λ[::-1]
         else:
             D = (jnp.einsum("ki,kj->ij", data, data, precision = jax.lax.Precision.HIGH) / N_samples).astype(jnp.float32)
             λ, V = jnp.linalg.eigh(D)
@@ -55,6 +58,9 @@ class PCA():
             S_inv = (1 / (jnp.sqrt(λ[-self.N:]) * jnp.sqrt(N_samples)))[jnp.newaxis, :]
             VS_inv = V[:, -self.N:] * S_inv
             self.U = jnp.einsum("ij,jk->ik", data, VS_inv, precision = jax.lax.Precision.HIGH).astype(jnp.float32)
+
+            self.U = self.U[:, ::-1]
+            self.λ = self.λ[::-1]
 
     def transform(self, X):
         '''Transforming X and computing principal components for each sample.
@@ -229,6 +235,9 @@ class PCA_m(PCA):
             self.λ, self.U = jnp.linalg.eigh(C)
             self.λ = jnp.sqrt(self.λ[-self.N:])
             self.U = self.U[:, -self.N:]
+
+            self.U = self.U[:, ::-1]
+            self.λ = self.λ[::-1]
         else:
             @partial(jax.pmap, in_axes = (0, 0), devices = self.devices, backend = "gpu")
             @jax.jit
@@ -247,3 +256,6 @@ class PCA_m(PCA):
                 return jnp.einsum("ij,jk->ik", d, VS_inv, precision = jax.lax.Precision.HIGH).astype(jnp.float32)
 
             self.U = jnp.concatenate([jnp.concatenate(partial_U(d)) for d in data], axis = 0)
+
+            self.U = self.U[:, ::-1]
+            self.λ = self.λ[::-1]
