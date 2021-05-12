@@ -109,10 +109,8 @@ class PCA():
         '''
         with h5py.File(filename, "w") as f:
             f.attrs["N"] = self.N
-            f.create_dataset("λ", data = np.array(self.λ, dtype = np.float32), **compression_scheme)
-            f.create_dataset("σ", data = np.array(self.σ, dtype = np.float32), **compression_scheme)
-            f.create_dataset("μ", data = np.array(self.μ, dtype = np.float32), **compression_scheme)
-            f.create_dataset("U", data = np.array(self.U, dtype = np.float32), **compression_scheme)
+            for k in ["λ", "σ", "μ", "U"]:
+                f.create_dataset(k, data = np.array(getattr(self, k), dtype = np.float32), **compression_scheme)
         
     def load(self, filename):
         '''Load the PCA fit. 
@@ -128,10 +126,8 @@ class PCA():
                 raise ValueError(
                     "File contains PCA of order {}, which is different from {}.".format(f.attrs["N"], self.N)
                     )
-            self.λ = jnp.array(f["λ"], dtype = jnp.float32)
-            self.σ = jnp.array(f["σ"], dtype = jnp.float32)
-            self.μ = jnp.array(f["μ"], dtype = jnp.float32)
-            self.U = jnp.array(f["U"], dtype = jnp.float32)
+            for k in ["λ", "σ", "μ", "U"]:
+                setattr(self, k, jnp.array(f[k], dtype = jnp.float32))
 
 
 class PCA_m(PCA):
