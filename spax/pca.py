@@ -2,6 +2,7 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 from functools import partial
+import h5py
 
 class PCA():
     '''PCA in jax.
@@ -96,8 +97,45 @@ class PCA():
         X_t = np.random.normal(size = (self.N, n)) * np.array(self.λ)[:, np.newaxis]
         return self.inverse_transform(X_t)
 
+    def save(self, filename, compression_scheme = {}):
+        '''Save the PCA fit as hdf5 file.
+        
+        Args:
+            filename: name of the file.
+            compression_scheme: dictionary containing compression options, 
+                eg. {"compression": "gzip", "compression_opts": 7, "shuffle": True}
+        
+        Returns:
+            `None`
+        '''
+        with h5py.File(filename, "w") as f:
+            f.attrs["N"] = self.N
+            f.create_dataset("λ", data = np.array(self.λ, dtype = np.float32), **compression_scheme)
+            f.create_dataset("σ", data = np.array(self.σ, dtype = np.float32), **compression_scheme)
+            f.create_dataset("μ", data = np.array(self.μ, dtype = np.float32), **compression_scheme)
+            f.create_dataset("U", data = np.array(self.U, dtype = np.float32), **compression_scheme)
+        
+    def load(self, filename):
+        '''Load the PCA fit. 
+        
+        Args:
+            filename: name of the file.
+        
+        Returns:
+            `None`
+        '''
+        with h5py.File(filename, "r") as f:
+            if self.N != f.attrs["N"]:
+                raise ValueError(
+                    "File contains PCA of order {}, which is different from {}.".format(f.attrs["N"], self.N)
+                    )
+            self.λ = jnp.array(f["λ"], dtype = jnp.float32)
+            self.σ = jnp.array(f["σ"], dtype = jnp.float32)
+            self.μ = jnp.array(f["μ"], dtype = jnp.float32)
+            self.U = jnp.array(f["U"], dtype = jnp.float32)
 
-class PCA_m():
+
+class PCA_m(PCA):
     '''PCA in jax, for CPU + GPU environments.
 
     Designed to use CPU as a host. To configure properly, put the following
@@ -121,7 +159,7 @@ class PCA_m():
 
     '''
     def __init__(self, N, devices):
-        self.N = N
+        super().__init__(N)
         self.devices = devices
         
     def fit(self, data, batch_size = None, whiten = False):
@@ -204,42 +242,3 @@ class PCA_m():
                 return jnp.einsum("ij,jk->ik", d, VS_inv, precision = jax.lax.Precision.HIGH).astype(jnp.float32)
 
             self.U = jnp.concatenate([jnp.concatenate(partial_U(d)) for d in data], axis = 0)
-
-    def transform(self, X):
-        '''Transforming X and computing principal components for each sample.
-
-        Args:
-            X: data to transform of shape `(N_dim, N_samples)`.
-        
-        Returns:
-            X_t: transformed data of shape `(N, N_samples)`.
-        '''
-        X = X.astype(np.float32)
-        X_t = jnp.einsum("ji,jk->ik", self.U, (X - self.μ) / self.σ)
-        return np.array(X_t, dtype = np.float32)
-
-    def inverse_transform(self, X_t):
-        '''Transforming X_t back to the original space.
-
-        Args:
-            X_t: data in principal-components space, of shape `(N, N_samples)`.
-        
-        Returns:
-            X: transformed data in original space, of shape `(N_dim, N_samples)`.
-        '''
-        X_t = X_t.astype(np.float32)
-        X = jnp.einsum("ij,jk->ik", self.U, X_t) * self.σ + self.μ
-        return np.array(X, dtype = np.float32)
-
-    def sample(self, n = 1):
-        '''Sample from the multivariate Gaussian prior 
-        and compute the inverse_transofrm of the pulled samples.
-
-        Args:
-            n: number of samples.
-
-        Returns:
-            X: sampled data in original space, of shape `(N_dim, n)`.
-        '''
-        X_t = np.random.normal(size = (self.N, n)) * np.array(self.λ)[:, np.newaxis]
-        return self.inverse_transform(X_t)
