@@ -71,7 +71,6 @@ class PCA():
         Returns:
             X_t: transformed data of shape `(N, N_samples)`.
         '''
-        #self.v.T == R, self.v == R^{-1}, where R is a rotation matrix.
         X = jnp.array(X, dtype = jnp.float32)
         X_t = jnp.einsum("ji,jk->ik", self.U, (X - self.μ) / self.σ)
         return np.array(X_t, dtype = np.float32)
@@ -259,3 +258,58 @@ class PCA_m(PCA):
 
             self.U = self.U[:, ::-1]
             self.λ = self.λ[::-1]
+
+    def transform(self, X, batch_size = None):
+        '''Transforming X and computing principal components for each sample.
+
+        Args:
+            X: data to transform of shape `(N_dim, N_samples)`.
+            batch_size: splitting calculation in data chunks of `(N_dim / n_devices / batch_size, N_samples)`. 
+
+        Returns:
+            X_t: transformed data of shape `(N, N_samples)`.
+        '''
+        n_d = len(self.devices)
+        N_dim, N_samples = X.shape
+        batch_size = N_dim // n_d if batch_size is None else batch_size
+        X = X.astype(np.float32).reshape(N_dim // (n_d * batch_size), n_d, batch_size, N_samples)
+        μ = self.μ.reshape(N_dim // (n_d * batch_size), n_d, batch_size, 1)
+        σ = self.σ.reshape(N_dim // (n_d * batch_size), n_d, batch_size, 1)
+        U = self.U.reshape(N_dim // (n_d * batch_size), n_d, batch_size, self.N)
+
+        @partial(jax.pmap, in_axes = (0, 0, 0, 0), devices = self.devices, backend = "gpu")
+        @jax.jit
+        def partial_transform(U, x, μ, σ):
+            return jnp.einsum("ji,jk->ik", U, (x - μ) / σ, precision = jax.lax.Precision.HIGH).astype(jnp.float32)
+
+        X_t = jnp.sum(
+            jnp.array([jnp.sum(partial_transform(_u, _x, _μ, _σ), axis = 0) for _u, _x, _μ, _σ in zip(U, X, μ, σ)]), axis = 0)
+        return np.array(X_t, dtype = np.float32)
+
+    def inverse_transform(self, X_t, batch_size = None):
+        '''Transforming X_t back to the original space.
+
+        Args:
+            X_t: data in principal-components space, of shape `(N, N_samples)`.
+            batch_size: splitting calculation in data chunks of `(N_dim / n_devices / batch_size, N_samples)`. 
+
+        Returns:
+            X: transformed data in original space, of shape `(N_dim, N_samples)`.
+        '''
+        n_d = len(self.devices)
+        N_dim = self.U.shape[0]
+        batch_size = N_dim // n_d if batch_size is None else batch_size
+        X_t = jnp.array(X_t, dtype = jnp.float32)
+        μ = self.μ.reshape(N_dim // (n_d * batch_size), n_d, batch_size, 1)
+        σ = self.σ.reshape(N_dim // (n_d * batch_size), n_d, batch_size, 1)
+        U = self.U.reshape(N_dim // (n_d * batch_size), n_d, batch_size, self.N)
+
+        @partial(jax.pmap, in_axes = (0, 0, 0), devices = self.devices, backend = "gpu")
+        @jax.jit
+        def partial_inv_transform(U, μ, σ):
+            return jnp.einsum("ij,jk->ik", U, X_t, precision = jax.lax.Precision.HIGH).astype(jnp.float32) * σ + μ
+
+        X = jnp.concatenate(
+            jnp.array([jnp.concatenate(partial_inv_transform(_u, _μ, _σ), axis = 0) for _u, _μ, _σ in zip(U, μ, σ)]), axis = 0)
+        # X = jnp.einsum("ij,jk->ik", self.U, X_t) * self.σ + self.μ
+        return np.array(X, dtype = np.float32)
