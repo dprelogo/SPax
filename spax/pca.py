@@ -311,7 +311,6 @@ class PCA_m(PCA):
 
         X = jnp.concatenate(
             jnp.array([jnp.concatenate(partial_inv_transform(_u, _μ, _σ), axis = 0) for _u, _μ, _σ in zip(U, μ, σ)]), axis = 0)
-        # X = jnp.einsum("ij,jk->ik", self.U, X_t) * self.σ + self.μ
         return np.array(X, dtype = np.float32)
 
     def sample(self, n = 1, batch_size = None):
