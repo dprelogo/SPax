@@ -313,3 +313,18 @@ class PCA_m(PCA):
             jnp.array([jnp.concatenate(partial_inv_transform(_u, _μ, _σ), axis = 0) for _u, _μ, _σ in zip(U, μ, σ)]), axis = 0)
         # X = jnp.einsum("ij,jk->ik", self.U, X_t) * self.σ + self.μ
         return np.array(X, dtype = np.float32)
+
+    def sample(self, n = 1, batch_size = None):
+        '''Sample from the multivariate Gaussian prior 
+        and compute the inverse_transofrm of the pulled samples.
+
+        Args:
+            n: number of samples.
+            batch_size: splitting calculation in data chunks of `(N_dim / n_devices / batch_size, N_samples)`.
+                Only for inverse_transform calculation. 
+
+        Returns:
+            X: sampled data in original space, of shape `(N_dim, n)`.
+        '''
+        X_t = np.random.normal(size = (self.N, n)) * np.array(self.λ)[:, np.newaxis]
+        return self.inverse_transform(X_t, batch_size)
