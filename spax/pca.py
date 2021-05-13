@@ -321,7 +321,7 @@ class PCA_m(PCA):
         Args:
             n: number of samples.
             batch_size: splitting calculation in data chunks of `(N_dim / n_devices / batch_size, N_samples)`.
-                Only for inverse_transform calculation. 
+                Used only for the inverse_transform calculation. 
 
         Returns:
             X: sampled data in original space, of shape `(N_dim, n)`.
