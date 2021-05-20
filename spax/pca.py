@@ -160,7 +160,7 @@ class PCA_m(PCA):
         sample: sampling multivariate gaussian distribution of the principal components
             and computing inverse_transform.
     '''
-    def __init__(self, N, devices):
+    def __init__(self, devices, N = None):
         super().__init__(N)
         self.devices = devices
         
