@@ -11,7 +11,7 @@ class PCA():
     No additional setup needed.
 
     Attributes:
-        N: number of principal components.
+        N: number of principal components. If not given, keeps maximal number of components.
     
     Methods:
         fit: computing principal vectors.
@@ -20,7 +20,7 @@ class PCA():
         sample: sampling multivariate gaussian distribution of the principal components
             and computing inverse_transform.
     '''
-    def __init__(self, N):
+    def __init__(self, N = None):
         self.N = N
         
     def fit(self, data, whiten = False):
@@ -35,6 +35,9 @@ class PCA():
         '''
         data = jnp.array(data, dtype = jnp.float32)
         N_dim, N_samples = data.shape
+        if self.N is None:
+            self.N = min(N_dim, N_samples)
+
         self.μ = jnp.mean(data, axis = 1, keepdims = True, dtype = jnp.float64).astype(jnp.float32)
         if whiten:
             self.σ = jnp.std(data, axis = 1, keepdims = True, dtype = jnp.float64).astype(jnp.float32)
@@ -147,7 +150,7 @@ class PCA_m(PCA):
     and pass `jax.devices("gpu")` as devices.
 
     Attributes:
-        N: number of principal components.
+        N: number of principal components. If not given, keeps maximal number of components.
         devices: list of `jax.devices`.
     
     Methods:
@@ -177,6 +180,8 @@ class PCA_m(PCA):
         '''
         n_d = len(self.devices)
         N_dim, N_samples = data.shape
+        if self.N is None:
+            self.N = min(N_dim, N_samples)
         batch_size = N_dim // n_d if batch_size is None else batch_size
         if N_dim % (n_d * batch_size) != 0:
             raise ValueError("N_dim of the data should be divisible by the n_devices * batch_size.")
