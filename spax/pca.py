@@ -44,7 +44,7 @@ class PCA():
         data = (data - self.μ) / self.σ
 
         if N_dim <= N_samples:
-            C = (jnp.einsum("ik,jk->ij", data, data, precision = jax.lax.Precision.HIGH) / (N_dim - 1)).astype(jnp.float32)
+            C = (jnp.einsum("ik,jk->ij", data, data, precision = jax.lax.Precision.HIGH) / (N_samples - 1)).astype(jnp.float32)
             self.λ, self.U = jnp.linalg.eigh(C)
             self.λ = jnp.sqrt(self.λ[-self.N:])
             self.U = self.U[:, -self.N:]
@@ -52,10 +52,10 @@ class PCA():
             self.U = self.U[:, ::-1]
             self.λ = self.λ[::-1]
         else:
-            D = (jnp.einsum("ki,kj->ij", data, data, precision = jax.lax.Precision.HIGH) / N_samples).astype(jnp.float32)
+            D = (jnp.einsum("ki,kj->ij", data, data, precision = jax.lax.Precision.HIGH) / N_dim).astype(jnp.float32)
             λ, V = jnp.linalg.eigh(D)
-            self.λ = jnp.sqrt(λ[-self.N:]) * jnp.sqrt(N_samples / (N_dim - 1))
-            S_inv = (1 / (jnp.sqrt(λ[-self.N:]) * jnp.sqrt(N_samples)))[jnp.newaxis, :]
+            self.λ = jnp.sqrt(λ[-self.N:]) * jnp.sqrt(N_dim / (N_samples - 1))
+            S_inv = (1 / (jnp.sqrt(λ[-self.N:]) * jnp.sqrt(N_dim)))[jnp.newaxis, :]
             VS_inv = V[:, -self.N:] * S_inv
             self.U = jnp.einsum("ij,jk->ik", data, VS_inv, precision = jax.lax.Precision.HIGH).astype(jnp.float32)
 
