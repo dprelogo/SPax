@@ -10,9 +10,15 @@ class Fisher():
     Attributes:
         devices: list of `jax.devices`. Set only for usage with GPU(s).
             If not given, computation is done on a default device.
+            Probably desired behaviour is to put the following at the beginning of your script:
+            ```
+            import jax
+            jax.config.update('jax_platform_name', 'cpu')
+            ```
+            and pass `jax.devices("gpu")` as devices.
     
     Methods:
-        fit: fitting the data and obtaining covariance matrix and dμ_dθ
+        fit: fitting the data and obtaining covariance matrix and `dμ_dθ`.
         compute: computing the Fisher information matrix, assuming multivariate Gaussian.
     '''
     def __init__(self, devices = None):
@@ -29,7 +35,7 @@ class Fisher():
                 `N_dim % batch_size == 0`
 
         Returns:
-            Fisher matrix F, if `det == False`, else `det(F)`.
+            An instance of itself.
         '''
         N_dim, N_samples = data.shape
         if self.devices is None:
