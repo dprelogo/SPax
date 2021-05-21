@@ -24,6 +24,5 @@ setup(
         "jaxlib",
         "numpy",
         "h5py",
-        "scikit-learn",
         ],
 )
