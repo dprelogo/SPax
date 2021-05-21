@@ -60,7 +60,7 @@ class Fisher():
                 return jnp.einsum("ki,kj->ij", u, j, precision = jax.lax.Precision.HIGH).astype(jnp.float32)
             U = pca.U.reshape(N_dim // (n_d * batch_size), n_d, batch_size, N_samples)
             dμ_dθ = dμ_dθ.reshape(N_dim // (n_d * batch_size), n_d, batch_size, len(δθ))
-            self.UtJ = jnp.sum(jnp.array([jnp.sum(partial_UtJ(u, j), axis = 0) for u, j in zip(U, dμ_dθ)])).astype(jnp.float32)
+            self.UtJ = jnp.sum(jnp.array([jnp.sum(partial_UtJ(u, j), axis = 0) for u, j in zip(U, dμ_dθ)]), axis = 0).astype(jnp.float32)
         
         return self
 
