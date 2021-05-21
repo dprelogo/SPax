@@ -6,7 +6,7 @@ with open("README.md", "r") as f:
 setup(
     name="SPax",
     version="0.1dev",
-    author="David Prelogovic",
+    author="David Prelogović",
     author_email="david.prelogovic@gmail.com",
     description="Signal processing in Jax.",
     long_description=long_description,
