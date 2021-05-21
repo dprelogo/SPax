@@ -46,7 +46,7 @@ class PCA():
 
         data = (data - self.μ) / self.σ
 
-        if N_dim <= N_samples:
+        if N_dim < N_samples:
             C = (jnp.einsum("ik,jk->ij", data, data, precision = jax.lax.Precision.HIGH) / (N_samples - 1)).astype(jnp.float32)
             self.λ, self.U = jnp.linalg.eigh(C)
             self.λ = jnp.sqrt(self.λ[-self.N:])
@@ -223,7 +223,7 @@ class PCA_m(PCA):
         else:
             raise ValueError(f"centering_data is {centering_data}, should be either CPU or GPU.")
 
-        if N_dim <= N_samples:
+        if N_dim < N_samples:
             @partial(jax.pmap, in_axes = (0, None), devices = self.devices, backend = "gpu")
             @jax.jit
             def partial_C(d1, d2):
