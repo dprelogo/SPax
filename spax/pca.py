@@ -31,7 +31,7 @@ class PCA():
             whiten (bool): scaling all dimensions to the unit variance.
 
         Returns:
-            `None`
+            An instance of itself.
         '''
         data = jnp.array(data, dtype = jnp.float32)
         N_dim, N_samples = data.shape
@@ -64,6 +64,8 @@ class PCA():
 
             self.U = self.U[:, ::-1]
             self.λ = self.λ[::-1]
+
+        return self
 
     def transform(self, X):
         '''Transforming X and computing principal components for each sample.
@@ -176,7 +178,7 @@ class PCA_m(PCA):
             centering_data (str): either "CPU" or "GPU", where to perform data centering/whitening.
 
         Returns:
-            `None`
+            An instance of itself.
         '''
         n_d = len(self.devices)
         N_dim, N_samples = data.shape
@@ -263,6 +265,8 @@ class PCA_m(PCA):
 
             self.U = self.U[:, ::-1]
             self.λ = self.λ[::-1]
+        
+        return self
 
     def transform(self, X, batch_size = None):
         '''Transforming X and computing principal components for each sample.
