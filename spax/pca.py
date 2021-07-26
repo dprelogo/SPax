@@ -368,9 +368,9 @@ class KernelPCA():
         
         self.vectorized = {}
         if inverse_kernel == "same":
-            self.inverse_kernel = kernel
-            self.inverse_kernel_kwargs = kernel_kwargs
-            
+            inverse_kernel = kernel
+            inverse_kernel_kwargs = kernel_kwargs
+
         self._init_kernel(kernel, kernel_kwargs, "kernel")
         self._init_kernel(inverse_kernel, inverse_kernel_kwargs, "inverse_kernel")
     
