@@ -3,6 +3,7 @@ import jax
 import jax.numpy as jnp
 from functools import partial
 import h5py
+from . import kernels
 
 class PCA():
     '''PCA in jax.
@@ -336,3 +337,134 @@ class PCA_m(PCA):
         '''
         X_t = np.random.normal(size = (self.N, n)) * np.array(self.λ)[:, np.newaxis]
         return self.inverse_transform(X_t, batch_size)
+    
+
+class kernel_PCA():
+    '''Kernel PCA in jax.
+
+    Assuming data and intermediate results fit on a local device (RAM or GPU memory).
+    No additional setup needed.
+
+    Attributes:
+        N: number of principal components. If not given, keeps N_samples components.
+        kernel: a kernel function, or string ["rbf", ]
+        kernel_kwargs: arguments needed for a kernel specification
+        inverse_kernel: a kernel function or string ["rbf", ]
+            Which kernel to use for the inverse transform, None does simplest transformation, "same" takes the same function as kernel
+        inverse_kernel_kwargs: possible arguments for inverse_kernel.
+    
+    Methods:
+        fit: computing principal vectors.
+        transform: calculating principal components for a given input.
+        inverse_transform: inverse of the transform.
+    '''
+    def __init__(self, N = None, α = 1.0, kernel = "rbf", kernel_kwargs = None, inverse_kernel = None, inverse_kernel_kwargs = None):
+        self.N = N
+        self.α = α
+        
+        self._init_kernel(kernel, kernel_kwargs, "kernel")
+        if inverse_kernel == "same":
+            self.inverse_kernel = self.kernel
+        else:
+            self._init_kernel(inverse_kernel, inverse_kernel_kwargs, "inverse_kernel")
+    
+    def _init_kernel(self, kernel, kernel_kwargs, name = "kernel"):
+        if kernel is None or callable(kernel):
+            setattr(self, name, kernel)
+        else:
+            try:
+                setattr(self, name, getattr(kernels, f"_{kernel}"))
+            except:
+                raise ValueError(f"Kernel {kernel} not supported")
+            if kernel_kwargs is not None:
+                setattr(self, name, partial(getattr(self, name), **kernel_kwargs))
+                
+        if kernel is not None:
+            setattr(self, name, jax.vmap(jax.vmap(getattr(self, name), in_axes = (None, 1)), in_axes = (1, None)))
+        
+    def _kernel_normalization(self, K):
+        K_columns = jnp.sum(K, axis = 1)[:, jnp.newaxis] / self.N_samples
+        return K - self.K_rows - K_columns - self.K_0
+    
+    def _init_kernel_normalization(self, K):
+        self.K_rows = jnp.sum(K, axis = 0)[jnp.newaxis, :] / self.N_samples
+        self.K_0 = jnp.sum(self.K_rows) / self.N_samples
+        return self._kernel_normalization(K)
+    
+    def _fit_inverse_transform(self, K):
+#         φ = self.transform(self.data)
+        # shortened expression
+        self.φ = (self.V * self.λ).T
+        
+        if self.inverse_kernel is None:
+            regularized_K = K + self.α * jnp.eye(K.shape[0])
+            A = jnp.linalg.solve(regularized_K, self.data.T)
+            self.W = jnp.einsum("ij,jk->ik", self.φ, A)
+        else:
+            K = self.inverse_kernel(self.φ, self.φ)
+            regularized_K = K + self.α * jnp.eye(K.shape[0])
+            self.W = jax.scipy.linalg.solve(regularized_K, self.data.T, sym_pos = True, overwrite_a = True)
+            
+        
+    def fit(self, data):
+        '''Computing eigenvectors and eigenvalues of the data.
+
+        Args:
+            data (np.array): data to fit, of shape `(N_dim, N_samples)`.
+
+        Returns:
+            An instance of itself.
+        '''
+        self.data = jnp.array(data, dtype = jnp.float32)
+        self.N_dim, self.N_samples = data.shape
+        self.N = self.N or self.N_samples
+        
+        K = self.kernel(self.data, self.data)
+#         print(K.shape)
+        K = self._init_kernel_normalization(K)
+        λ, U = jnp.linalg.eigh(K)
+        λ = λ[-self.N:]
+        V = U[:, -self.N:] / jnp.sqrt(λ[jnp.newaxis, :])
+        
+#         V = U / jnp.sqrt(λ[jnp.newaxis, :])
+        
+        self.V = V[:, ::-1]
+        self.λ = λ[::-1]
+        
+        self._fit_inverse_transform(K)
+
+        return self
+
+    def transform(self, X):
+        '''Transforming X and computing principal components for each sample.
+
+        Args:
+            X: data to transform of shape `(N_dim, N_samples)`.
+        
+        Returns:
+            X_t: transformed data of shape `(N, N_samples)`.
+        '''
+        X = jnp.array(X, dtype = jnp.float32)
+        K = self.kernel(X, self.data)
+        K = self._kernel_normalization(K)
+        X_t = jnp.einsum("ij,jk->ki", K, self.V)
+        return np.array(X_t, dtype = np.float32)
+    
+    def inverse_transform(self, X_t):
+        '''Transforming X_t back to the original space.
+
+        Args:
+            X_t: data in principal-components space, of shape `(N, N_samples)`.
+        
+        Returns:
+            X: transformed data in original space, of shape `(N_dim, N_samples)`.
+        '''
+        X_t = jnp.array(X_t, dtype = jnp.float32)
+        if self.inverse_kernel is None:
+            X = jnp.einsum("ij,ik->kj", X_t, self.W)
+            return np.array(X, dtype = np.float32)
+        else:
+            K = self.kernel(X_t, self.φ)
+            print(K.shape, self.W.shape)
+            X = jnp.einsum("ij,jk->ki", K, self.W)
+            return np.array(X, dtype = np.float32)
