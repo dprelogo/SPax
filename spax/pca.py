@@ -367,12 +367,11 @@ class KernelPCA():
         self.α = α
         
         self.vectorized = {}
-        if inverse_kernel == "same":
-            inverse_kernel = kernel
-            inverse_kernel_kwargs = kernel_kwargs
-
         self._init_kernel(kernel, kernel_kwargs, "kernel")
-        self._init_kernel(inverse_kernel, inverse_kernel_kwargs, "inverse_kernel")
+        if inverse_kernel == "same":
+            self._init_kernel(kernel, kernel_kwargs, "inverse_kernel")
+        else:
+            self._init_kernel(inverse_kernel, inverse_kernel_kwargs, "inverse_kernel")
     
     def _init_kernel(self, kernel, kernel_kwargs, name = "kernel"):
         if kernel is None or callable(kernel):
