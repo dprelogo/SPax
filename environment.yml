@@ -8,6 +8,8 @@ dependencies:
   - numpy
   - h5py
   - scikit-learn
+  - matplotlib
+  - jupyterlab
   - pip:
     - jax
     - jaxlib

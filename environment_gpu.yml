@@ -8,6 +8,8 @@ dependencies:
   - numpy
   - h5py
   - scikit-learn
+  - matplotlib
+  - jupyterlab
   - pip:
     - jax
     - https://storage.googleapis.com/jax-releases/cuda110/jaxlib-0.1.65+cuda110-cp38-none-manylinux2010_x86_64.whl
