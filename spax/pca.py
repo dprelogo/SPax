@@ -387,9 +387,11 @@ class KernelPCA():
         self.vectorized[name] = False
 
     def _vectorize_kernel(self, name):
-        if self.kernel is not None and self.vectorized[name] == False:
-            setattr(self, name, jax.vmap(jax.vmap(getattr(self, name), in_axes = (None, 1)), in_axes = (1, None)))
-        
+        # if getattr(self, name) is not None and self.vectorized[name] == False:
+        #     setattr(self, name, jax.vmap(jax.vmap(getattr(self, name), in_axes = (None, 1)), in_axes = (1, None)))
+        #     self.vectorized[name] = True
+        pass
+
     def _kernel_normalization(self, K):
         K_columns = jnp.sum(K, axis = 1)[:, jnp.newaxis] / self.N_samples
         return K - self.K_rows - K_columns - self.K_0
@@ -411,7 +413,7 @@ class KernelPCA():
         else:
             K = self.inverse_kernel(self.φ, self.φ)
             regularized_K = K + self.α * jnp.eye(K.shape[0])
-            self.W = jax.scipy.linalg.solve(regularized_K, self.data.T, sym_pos = True, overwrite_a = True)
+            self.W = jnp.linalg.solve(regularized_K, self.data.T)
             
         
     def fit(self, data):
@@ -427,7 +429,7 @@ class KernelPCA():
         self.N_dim, self.N_samples = data.shape
         self.N = self.N or self.N_samples
         
-        self._vectorize_kernel("kernel")
+        # self._vectorize_kernel("kernel")
 
         K = self.kernel(self.data, self.data)
 #         print(K.shape)
@@ -469,7 +471,7 @@ class KernelPCA():
         '''        
         X_t = jnp.array(X_t, dtype = jnp.float32)
         
-        self._vectorize_kernel("inverse_kernel")
+        # self._vectorize_kernel("inverse_kernel")
         
         if self.inverse_kernel is None:
             X = jnp.einsum("ij,ik->kj", X_t, self.W)
@@ -508,36 +510,59 @@ class KernelPCA_m(KernelPCA):
     def __init__(self, devices, N = None, α = 1.0, kernel = "rbf", kernel_kwargs = None, inverse_kernel = None, inverse_kernel_kwargs = None):
         super().__init__(N, α, kernel, kernel_kwargs, inverse_kernel, inverse_kernel_kwargs)
         self.devices = devices
-    
+
+    def _collect_kernel(self, name, X, Y, batch_size_X, batch_size_Y):
+        if self.vectorized[name] == False:
+            self._vectorize_kernel(name)
+
+        X = jnp.array(X, dtype = jnp.float32)
+        Y = jnp.array(Y, dtype = jnp.float32)
+        X = X.reshape(X.shape[0], X.shape[1] // batch_size_X, batch_size_X)
+        X = jnp.moveaxis(X, 0, -2)
+        Y = Y.reshape(Y.shape[0], Y.shape[1] // batch_size_Y // len(self.devices), len(self.devices), batch_size_Y)
+        Y = jnp.moveaxis(Y, 0, -2)
+
+        K = []
+        for y in Y:
+            row_K = []
+            for x in X:
+                p_K = jnp.concatenate(getattr(self, name)(x, y), axis = 1) #concatenating pmapped axis
+                row_K.append(p_K)
+            row_K = jnp.concatenate(row_K, axis = 1)
+            K.append(row_K)
+
+        return jnp.concatenate(K, axis = 0)
+
     def _vectorize_kernel(self, name):
         if self.kernel is not None and self.vectorized[name] == False:
             setattr(self, name, jax.pmap(getattr(self, name), in_axes = (None, 0), devices = self.devices, backend = "gpu"))
-    
-    def _collect_kernel(self, name, X, Y):
-        #TODO: Finish this
-        K = [getattr(self, name)(x, Y) for x in X]
-        K = jnp.array(K, dtype = jnp.float32).reshape(self.N_samples, self.N_samples)
-    
+            self.vectorized[name] = True
+
     def _fit_inverse_transform(self, K):
 #         φ = self.transform(self.data)
         # shortened expression
         self.φ = (self.V * self.λ).T
-        
+
+        _partial_solve = jax.pmap(jnp.linalg.solve, in_axes = (None, 0), devices = self.devices, backend = "gpu")
+        B = self.data.T.reshape(self.N_dim // self.batch_size_dim // len(self.devices), len(self.devices), self.batch_size_dim)
         if self.inverse_kernel is None:
             regularized_K = K + self.α * jnp.eye(K.shape[0])
-            A = jnp.linalg.solve(regularized_K, self.data.T)
-            self.W = jnp.einsum("ij,jk->ik", self.φ, A)
+            X = jnp.concatenate([jnp.concatenate(_partial_solve(regularized_K, b), axis = 1) for b in B], axis = 1)
+            self.W = jnp.einsum("ij,jk->ik", self.φ, X)
         else:
-            K = self.inverse_kernel(self.φ, self.φ)
+            K = self._collect_kernel("inverse_kernel", self.φ, self.φ, self.batch_size_samples, self.batch_size_samples)
             regularized_K = K + self.α * jnp.eye(K.shape[0])
-            self.W = jax.scipy.linalg.solve(regularized_K, self.data.T, sym_pos = True, overwrite_a = True)
-            
+            self.W = jnp.concatenate([jnp.concatenate(_partial_solve(regularized_K, b), axis = 1) for b in B], axis = 1)            
         
-    def fit(self, data):
+    def fit(self, data, batch_size_samples = None, batch_size_dim = None):
         '''Computing eigenvectors and eigenvalues of the data.
 
         Args:
             data (np.array): data to fit, of shape `(N_dim, N_samples)`.
+            batch_size_samples: size of batches for `N_samples`, defaults to `N_samples // N_devices`.
+                `N_samples` should be divisible by `batch_size_samples * N_devices`
+            batch_size_dim: size of batches for `N_dim`, defaults to `N_dim // N_devices`.
+                `N_dim` should be divisible by `batch_size_dim * N_devices`
 
         Returns:
             An instance of itself.
@@ -545,18 +570,16 @@ class KernelPCA_m(KernelPCA):
         self.data = jnp.array(data, dtype = jnp.float32)
         self.N_dim, self.N_samples = data.shape
         self.N = self.N or self.N_samples
+        self.batch_size_samples = batch_size_samples or self.N_samples // len(self.devices)
+        self.batch_size_dim = batch_size_dim or self.N_dim // len(self.devices)
         
-        self._vectorize_kernel("kernel")
-
-        K = self.kernel(self.data, self.data)
-#         print(K.shape)
+        K = self._collect_kernel("kernel", self.data, self.data, self.batch_size_samples, self.batch_size_samples)
+        K = jax.device_put(K, self.devices[0])
         K = self._init_kernel_normalization(K)
         λ, U = jnp.linalg.eigh(K)
         λ = λ[-self.N:]
         V = U[:, -self.N:] / jnp.sqrt(λ[jnp.newaxis, :])
-        
-#         V = U / jnp.sqrt(λ[jnp.newaxis, :])
-        
+                
         self.V = V[:, ::-1]
         self.λ = λ[::-1]
         
@@ -564,39 +587,45 @@ class KernelPCA_m(KernelPCA):
 
         return self
 
-    def transform(self, X):
+    def transform(self, X, batch_size_samples = None):
         '''Transforming X and computing principal components for each sample.
 
         Args:
             X: data to transform of shape `(N_dim, N_samples)`.
+            batch_size_samples: size of batches for `N_samples` of `X`, defaults to `N_samples`.
+                `N_samples` should be divisible by `batch_size_samples`
         
         Returns:
             X_t: transformed data of shape `(N, N_samples)`.
         '''
+        batch_size_samples = batch_size_samples or X.shape[1]
+
         X = jnp.array(X, dtype = jnp.float32)
-        K = self.kernel(X, self.data)
+        K = self._collect_kernel("kernel", X, self.data, batch_size_samples, self.batch_size_samples)
+        K = jax.device_put(K, self.devices[0])
         K = self._kernel_normalization(K)
         X_t = jnp.einsum("ij,jk->ki", K, self.V)
         return np.array(X_t, dtype = np.float32)
     
-    def inverse_transform(self, X_t):
+    def inverse_transform(self, X_t, batch_size_samples = None):
         '''Transforming X_t back to the original space.
 
         Args:
             X_t: data in principal-components space, of shape `(N, N_samples)`.
+            batch_size_samples: size of batches for `N_samples` of `X_t`, defaults to `N_samples`.   
+                `N_samples` should be divisible by `batch_size_samples`
         
         Returns:
             X: transformed data in original space, of shape `(N_dim, N_samples)`.
-        '''        
+        '''
+        batch_size_samples = batch_size_samples or X_t.shape[1]
+
         X_t = jnp.array(X_t, dtype = jnp.float32)
-        
-        self._vectorize_kernel("inverse_kernel")
-        
+                
         if self.inverse_kernel is None:
             X = jnp.einsum("ij,ik->kj", X_t, self.W)
             return np.array(X, dtype = np.float32)
         else:
-            K = self.inverse_kernel(X_t, self.φ)
-            # print(K.shape, self.W.shape)
+            K = self._collect_kernel("inverse_kernel", X_t, self.φ, batch_size_samples, self.batch_size_samples)
             X = jnp.einsum("ij,jk->ki", K, self.W)
             return np.array(X, dtype = np.float32)
