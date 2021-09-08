@@ -1,3 +1,4 @@
+from decimal import Decimal
 import numpy as np
 import jax
 import jax.numpy as jnp
@@ -50,7 +51,12 @@ class PCA():
         data = (data - self.μ) / self.σ
 
         if N_dim < N_samples:
-            C = (jnp.einsum("ik,jk->ij", data, data, precision = jax.lax.Precision.HIGH) / (N_samples - 1)).astype(jnp.float32)
+            C = jnp.einsum("ik,jk->ij", data, data, precision = jax.lax.Precision.HIGH) / (N_samples - 1)
+            try:
+                C = C.astype(jnp.float64)
+            except:
+                print("Couldn't use float64 precision.")
+                C = C.astype(jnp.float32)
             self.λ, self.U = jnp.linalg.eigh(C)
             self.λ = jnp.sqrt(self.λ[-self.N:])
             self.U = self.U[:, -self.N:]
@@ -58,7 +64,12 @@ class PCA():
             self.U = self.U[:, ::-1]
             self.λ = self.λ[::-1]
         else:
-            D = (jnp.einsum("ki,kj->ij", data, data, precision = jax.lax.Precision.HIGH) / N_dim).astype(jnp.float32)
+            D = jnp.einsum("ki,kj->ij", data, data, precision = jax.lax.Precision.HIGH) / N_dim
+            try:
+                D = D.astype(jnp.float64)
+            except:
+                print("Couldn't use float64 precision.")
+                D = D.astype(jnp.float32)
             λ, V = jnp.linalg.eigh(D)
             self.λ = jnp.sqrt(λ[-self.N:]) * jnp.sqrt(N_dim / (N_samples - 1))
             S_inv = (1 / (jnp.sqrt(λ[-self.N:]) * jnp.sqrt(N_dim)))[jnp.newaxis, :]
@@ -243,11 +254,16 @@ class PCA_m(PCA):
                 C.append(row_C)
             C = jnp.concatenate(C, axis = 0)
             C = jax.device_put(C, self.devices[0])
+            try:
+                C = C.astype(jnp.float64)
+            except:
+                print("Couldn't use float64 precision.")
+                C = C.astype(jnp.float32)
             self.λ, self.U = jnp.linalg.eigh(C)
             self.λ = jnp.sqrt(self.λ[-self.N:])
             self.U = self.U[:, -self.N:]
 
-            self.U = self.U[:, ::-1]
+            self.U = self.U[:, ::-1].astype(jnp.float32)
             self.λ = self.λ[::-1]
         else:
             @partial(jax.pmap, in_axes = (0, 0), devices = self.devices, backend = "gpu")
@@ -256,6 +272,11 @@ class PCA_m(PCA):
                 return (jnp.einsum("ki,kj->ij", d1, d2, precision = jax.lax.Precision.HIGH) / N_dim).astype(jnp.float32)
             D = jnp.sum(jnp.array([jnp.sum(partial_D(d1, d2), axis = 0) for d1, d2, in zip(data, data)]), axis = 0)
             D = jax.device_put(D, self.devices[0])
+            try:
+                D = D.astype(jnp.float64)
+            except:
+                print("Couldn't use float64 precision.")
+                D = D.astype(jnp.float32)
             λ, V = jnp.linalg.eigh(D)
             self.λ = jnp.sqrt(λ[-self.N:]) * jnp.sqrt(N_dim / (N_samples - 1))
             S_inv = (1 / (jnp.sqrt(λ[-self.N:]) * jnp.sqrt(N_dim)))[jnp.newaxis, :]
