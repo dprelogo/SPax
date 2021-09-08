@@ -482,6 +482,24 @@ class KernelPCA():
             X = jnp.einsum("ij,jk->ki", K, self.W)
             return np.array(X, dtype = np.float32)
 
+    def sample(self, n = 1, compute_inverse = False):
+        '''Sample from the multivariate Gaussian prior 
+        and (optionally) compute the inverse_transofrm of the pulled samples.
+
+        Args:
+            n: number of samples.
+            compute_inverse: either to compute the inverse of pulled samples or not.
+
+        Returns:
+            x: pulled samples, or sampled data in the original space, depending on the `compute_inverse` flag.
+        '''
+        X_t = np.random.normal(size = (self.N, n)) * np.sqrt(np.array(self.λ))[:, np.newaxis]
+
+        if compute_inverse:
+            return self.inverse_transform(X_t)
+        else:
+            return X_t
+
 
 class KernelPCA_m(KernelPCA):
     '''Kernel PCA in jax, for CPU + GPU environments.
@@ -672,3 +690,22 @@ class KernelPCA_m(KernelPCA):
             W = np.moveaxis(W, 0, -2)
             X = jnp.concatenate([jnp.concatenate(_partial_einsum(K, w), axis = 0) for w in W], axis = 0)
             return np.array(X, dtype = np.float32)
+
+    def sample(self, n = 1, compute_inverse = False, batch_size_samples = None):
+        '''Sample from the multivariate Gaussian prior 
+        and (optionally) compute the inverse_transofrm of the pulled samples.
+
+        Args:
+            n: number of samples.
+            compute_inverse: either to compute the inverse of pulled samples or not.
+            batch_size_samples: `batch_size_samples` for `inverse_transform`, ignored if `compute_inverse` is `False`.
+
+        Returns:
+            x: pulled samples, or sampled data in the original space, depending on the `compute_inverse` flag.
+        '''
+        X_t = np.random.normal(size = (self.N, n)) * np.sqrt(np.array(self.λ))[:, np.newaxis]
+        
+        if compute_inverse:
+            return self.inverse_transform(X_t, batch_size_samples)
+        else:
+            return X_t
