@@ -21,8 +21,8 @@ setup(
     python_requires=">=3.6",
     install_requires=[
         "jax",
-        "jaxlib",
         "numpy",
         "h5py",
         ],
+    extras_require={"gpu": ["jax[gpu]"]}
 )
