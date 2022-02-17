@@ -24,5 +24,8 @@ setup(
         "numpy",
         "h5py",
         ],
-    extras_require={"gpu": ["jax[cuda]"]}
+    extras_require={"gpu": ["jax[cuda]"]},
+    dependency_links=[
+        "https://storage.googleapis.com/jax-releases/jax_releases.html"
+    ],
 )
