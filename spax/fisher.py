@@ -46,7 +46,8 @@ class Fisher:
             self.Σ_inv = 1 / pca.λ**2
 
             dμ_dθ = jnp.mean(
-                (derivatives[:, 1, ...] - derivatives[:, 0, ...]) / δθ,
+                (derivatives[:, 1, ...] - derivatives[:, 0, ...])
+                / jnp.reshape(δθ, (1, -1, 1)),
                 axis=-1,
                 dtype=jnp.float64,
             ).astype(jnp.float32)
