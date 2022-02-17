@@ -20,9 +20,9 @@ setup(
         ],
     python_requires=">=3.6",
     install_requires=[
-        "jax",
+        "jax[cpu]",
         "numpy",
         "h5py",
         ],
-    extras_require={"gpu": ["jax[gpu]"]}
+    extras_require={"gpu": ["jax[cuda]"]}
 )
