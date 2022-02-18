@@ -41,9 +41,9 @@ class Fisher:
         """
         N_dim, N_samples = data.shape
         if self.devices is None:
-            pca = PCA()
-            pca.fit(data)
-            self.Σ_inv = 1 / pca.λ**2
+            self.pca = PCA()
+            self.pca.fit(data)
+            self.Σ_inv = 1 / self.pca.λ**2
 
             dμ_dθ = jnp.mean(
                 (derivatives[:, 1, ...] - derivatives[:, 0, ...])
@@ -53,14 +53,14 @@ class Fisher:
             ).astype(jnp.float32)
 
             self.UtJ = jnp.einsum(
-                "ki,kj->ij", pca.U, dμ_dθ, precision=jax.lax.Precision.HIGH
+                "ki,kj->ij", self.pca.U, dμ_dθ, precision=jax.lax.Precision.HIGH
             ).astype(jnp.float32)
         else:
             n_d = len(self.devices)
             batch_size = N_dim // n_d if batch_size is None else batch_size
-            pca = PCA_m(devices=self.devices)
-            pca.fit(data, batch_size=batch_size, centering_data="GPU")
-            self.Σ_inv = 1 / pca.λ**2
+            self.pca = PCA_m(devices=self.devices)
+            self.pca.fit(data, batch_size=batch_size, centering_data="GPU")
+            self.Σ_inv = 1 / self.pca.λ**2
 
             @partial(jax.pmap, devices=self.devices, backend="gpu")
             @jax.jit
@@ -87,7 +87,9 @@ class Fisher:
                     "ki,kj->ij", u, j, precision=jax.lax.Precision.HIGH
                 ).astype(jnp.float32)
 
-            U = pca.U.reshape(N_dim // (n_d * batch_size), n_d, batch_size, N_samples)
+            U = self.pca.U.reshape(
+                N_dim // (n_d * batch_size), n_d, batch_size, N_samples
+            )
             dμ_dθ = dμ_dθ.reshape(N_dim // (n_d * batch_size), n_d, batch_size, len(δθ))
             self.UtJ = jnp.sum(
                 jnp.array(
