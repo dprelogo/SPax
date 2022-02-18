@@ -1,4 +1,5 @@
 from decimal import Decimal
+import warnings
 import numpy as np
 import jax
 import jax.numpy as jnp
@@ -29,7 +30,7 @@ class PCA:
     def __init__(self, N=None):
         self.N = N
 
-    def fit(self, data, whiten=False):
+    def fit(self, data, whiten=False, use_eig=True):
         """Computing eigenvectors and eigenvalues of the data.
 
         Args:
@@ -63,19 +64,18 @@ class PCA:
             try:
                 C = C.astype(jnp.float64)
             except:
-                print("Couldn't use float64 precision.")
+                warnings.warn("Couldn't use float64 precision for covariance.")
                 C = C.astype(jnp.float32)
-            self.λ, self.U = jnp.linalg.eigh(C)
-            print(self.λ)
-            self.λ, self.U = jnp.linalg.eig(C)
-            print(self.λ)
-            self.λ = jnp.sqrt(jnp.abs(self.λ[-self.N :]))
-            print(self.λ)
+            self.eigenvalues, self.U = jnp.linalg.eigh(C)
+            self.eigenvalues = self.eigenvalues[-self.N :]
+            if jnp.any(self.eigenvalues < 0):
+                warnings.warn("Some eigenvalues are negative.")
+            self.λ = jnp.sqrt(self.eigenvalues)
             self.U = jnp.real(self.U[:, -self.N :])
-            print(self.U)
 
-            self.U = self.U[:, ::-1]
+            self.eigenvalues = self.eigenvalues[::-1]
             self.λ = self.λ[::-1]
+            self.U = self.U[:, ::-1]
         else:
             D = (
                 jnp.einsum("ki,kj->ij", data, data, precision=jax.lax.Precision.HIGH)
@@ -84,11 +84,14 @@ class PCA:
             try:
                 D = D.astype(jnp.float64)
             except:
-                print("Couldn't use float64 precision.")
+                warnings.warn("Couldn't use float64 precision for covariance.")
                 D = D.astype(jnp.float32)
-            λ, V = jnp.linalg.eigh(D)
-            self.λ = jnp.sqrt(λ[-self.N :]) * jnp.sqrt(N_dim / (N_samples - 1))
-            S_inv = (1 / (jnp.sqrt(λ[-self.N :]) * jnp.sqrt(N_dim)))[jnp.newaxis, :]
+            self.eigenvalues, V = jnp.linalg.eigh(D)
+            self.eigenvalues = self.eigenvalues[-self.N :] * (N_dim / (N_samples - 1))
+            if jnp.any(self.eigenvalues < 0):
+                warnings.warn("Some eigenvalues are negative.")
+            self.λ = jnp.sqrt(self.eigenvalues)
+            S_inv = (1 / jnp.sqrt(self.eigenvalues * (N_samples - 1)))[jnp.newaxis, :]
             VS_inv = V[:, -self.N :] * S_inv
             self.U = jnp.einsum(
                 "ij,jk->ik", data, VS_inv, precision=jax.lax.Precision.HIGH
@@ -302,14 +305,18 @@ class PCA_m(PCA):
             try:
                 C = C.astype(jnp.float64)
             except:
-                print("Couldn't use float64 precision.")
+                warnings.warn("Couldn't use float64 precision for covariance.")
                 C = C.astype(jnp.float32)
-            self.λ, self.U = jnp.linalg.eigh(C)
-            self.λ = jnp.sqrt(self.λ[-self.N :])
-            self.U = self.U[:, -self.N :]
+            self.eigenvalues, self.U = jnp.linalg.eigh(C)
+            self.eigenvalues = self.eigenvalues[-self.N :]
+            if jnp.any(self.eigenvalues < 0):
+                warnings.warn("Some eigenvalues are negative.")
+            self.λ = jnp.sqrt(self.eigenvalues)
+            self.U = jnp.real(self.U[:, -self.N :])
 
-            self.U = self.U[:, ::-1].astype(jnp.float32)
+            self.eigenvalues = self.eigenvalues[::-1]
             self.λ = self.λ[::-1]
+            self.U = self.U[:, ::-1]
         else:
 
             @partial(jax.pmap, in_axes=(0, 0), devices=self.devices, backend="gpu")
@@ -330,11 +337,14 @@ class PCA_m(PCA):
             try:
                 D = D.astype(jnp.float64)
             except:
-                print("Couldn't use float64 precision.")
+                warnings.warn("Couldn't use float64 precision for covariance.")
                 D = D.astype(jnp.float32)
-            λ, V = jnp.linalg.eigh(D)
-            self.λ = jnp.sqrt(λ[-self.N :]) * jnp.sqrt(N_dim / (N_samples - 1))
-            S_inv = (1 / (jnp.sqrt(λ[-self.N :]) * jnp.sqrt(N_dim)))[jnp.newaxis, :]
+            self.eigenvalues, V = jnp.linalg.eigh(D)
+            self.eigenvalues = self.eigenvalues[-self.N :] * (N_dim / (N_samples - 1))
+            if jnp.any(self.eigenvalues < 0):
+                warnings.warn("Some eigenvalues are negative.")
+            self.λ = jnp.sqrt(self.eigenvalues)
+            S_inv = (1 / jnp.sqrt(self.eigenvalues * (N_samples - 1)))[jnp.newaxis, :]
             VS_inv = V[:, -self.N :] * S_inv
 
             @partial(jax.pmap, devices=self.devices, backend="gpu")
