@@ -42,8 +42,8 @@ class Fisher:
         N_dim, N_samples = data.shape
         if self.devices is None:
             self.pca = PCA()
-            self.pca.fit(data)
-            self.Σ_inv = 1 / self.pca.λ**2
+            self.pca.fit(data, use_SVD=True)
+            self.Σ_inv = 1 / self.pca.eigenvalues
 
             dμ_dθ = jnp.mean(
                 (derivatives[:, 1, ...] - derivatives[:, 0, ...])
@@ -59,8 +59,10 @@ class Fisher:
             n_d = len(self.devices)
             batch_size = N_dim // n_d if batch_size is None else batch_size
             self.pca = PCA_m(devices=self.devices)
-            self.pca.fit(data, batch_size=batch_size, centering_data="GPU")
-            self.Σ_inv = 1 / self.pca.λ**2
+            self.pca.fit(
+                data, batch_size=batch_size, centering_data="GPU", use_SVD=True
+            )
+            self.Σ_inv = 1 / self.pca.eigenvalues
 
             @partial(jax.pmap, devices=self.devices, backend="gpu")
             @jax.jit
