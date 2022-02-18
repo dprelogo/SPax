@@ -66,10 +66,10 @@ class PCA:
                 print("Couldn't use float64 precision.")
                 C = C.astype(jnp.float32)
             # self.λ, self.U = jnp.linalg.eigh(C)
-            self.λ, self.U = jax.scipy.linalg.eigh(C)
+            self.λ, self.U = jax.scipy.linalg.eig(C)
             print(self.λ)
-            self.λ = jnp.sqrt(self.λ[-self.N :])
-            self.U = self.U[:, -self.N :]
+            self.λ = jnp.sqrt(jnp.abs(self.λ[-self.N :]))
+            self.U = jnp.real(self.U[:, -self.N :])
 
             self.U = self.U[:, ::-1]
             self.λ = self.λ[::-1]
