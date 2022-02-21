@@ -26,7 +26,7 @@ class Fisher:
     def __init__(self, devices=None):
         self.devices = devices
 
-    def fit(self, data, derivatives, δθ, batch_size=None):
+    def fit(self, data, derivatives, δθ, batch_size=None, use_SVD=True):
         """Fitting the data.
 
         Args:
@@ -35,6 +35,8 @@ class Fisher:
             δθ: diferential value of each parameter used to build `derivatives`.
             batch_size: split computation in `N_dim // batch_size`.
                 `N_dim % batch_size == 0`
+            use_SVD: Etiher to use SVD decomposition while computing covariance
+                inverse. See `spax.pca.PCA` for details.
 
         Returns:
             An instance of itself.
@@ -42,7 +44,7 @@ class Fisher:
         N_dim, N_samples = data.shape
         if self.devices is None:
             self.pca = PCA()
-            self.pca.fit(data, use_SVD=True)
+            self.pca.fit(data, use_SVD=use_SVD)
             self.Σ_inv = 1 / self.pca.eigenvalues
 
             dμ_dθ = jnp.mean(
@@ -60,7 +62,7 @@ class Fisher:
             batch_size = N_dim // n_d if batch_size is None else batch_size
             self.pca = PCA_m(devices=self.devices)
             self.pca.fit(
-                data, batch_size=batch_size, centering_data="GPU", use_SVD=True
+                data, batch_size=batch_size, centering_data="GPU", use_SVD=use_SVD
             )
             self.Σ_inv = 1 / self.pca.eigenvalues
 
