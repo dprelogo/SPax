@@ -562,11 +562,13 @@ class KernelPCA:
             regularized_K = K + self.α * jnp.eye(K.shape[0])
             self.W = jnp.linalg.solve(regularized_K, self.data.T)
 
-    def fit(self, data):
+    def fit(self, data, use_SVD=False):
         """Computing eigenvectors and eigenvalues of the data.
 
         Args:
             data (np.array): data to fit, of shape `(N_dim, N_samples)`.
+            use_SVD (bool): If true, it uses SVD decomposition, which might be
+                more stable numerically.
 
         Returns:
             An instance of itself.
@@ -578,14 +580,19 @@ class KernelPCA:
         # self._vectorize_kernel("kernel")
 
         K = self.kernel(self.data, self.data)
-        #         print(K.shape)
         K = self._init_kernel_normalization(K)
-        λ, U = jnp.linalg.eigh(K)
-        λ = λ[-self.N :]
-        V = U[:, -self.N :] / jnp.sqrt(λ[jnp.newaxis, :])
 
-        self.V = V[:, ::-1]
-        self.λ = λ[::-1]
+        if use_SVD:
+            U, λ, _ = jnp.linalg.svd(K, full_matrices=False, hermitian=True)
+        else:
+            λ, U = jnp.linalg.eigh(K)
+            λ = λ[::-1]
+            U = U[:, ::-1]
+
+        self.λ = λ[: self.N]
+        if jnp.any(λ < 0):
+            warnings.warn("Some eigenvalues are negative.")
+        self.V = U[:, : self.N] / jnp.sqrt(self.λ[jnp.newaxis, :])
 
         self._fit_inverse_transform(K)
 
@@ -799,7 +806,7 @@ class KernelPCA_m(KernelPCA):
                 axis=1,
             )
 
-    def fit(self, data, batch_size_samples=None, batch_size_dim=None):
+    def fit(self, data, batch_size_samples=None, batch_size_dim=None, use_SVD=False):
         """Computing eigenvectors and eigenvalues of the data.
 
         Args:
@@ -808,6 +815,8 @@ class KernelPCA_m(KernelPCA):
                 `N_samples` should be divisible by `batch_size_samples * N_devices`
             batch_size_dim: size of batches for `N_dim`, defaults to `N_dim // N_devices` or 1 for small `N_dim`.
                 `N_dim` should be divisible by `batch_size_dim * N_devices`
+            use_SVD (bool): If true, it uses SVD decomposition, which might be
+                more stable numerically.
 
         Returns:
             An instance of itself.
@@ -835,12 +844,18 @@ class KernelPCA_m(KernelPCA):
         )
         K = jax.device_put(K, self.devices[0])
         K = self._init_kernel_normalization(K)
-        λ, U = jnp.linalg.eigh(K)
-        λ = λ[-self.N :]
-        V = U[:, -self.N :] / jnp.sqrt(λ[jnp.newaxis, :])
 
-        self.V = V[:, ::-1]
-        self.λ = λ[::-1]
+        if use_SVD:
+            U, λ, _ = jnp.linalg.svd(K, full_matrices=False, hermitian=True)
+        else:
+            λ, U = jnp.linalg.eigh(K)
+            λ = λ[::-1]
+            U = U[:, ::-1]
+
+        self.λ = λ[: self.N]
+        if jnp.any(λ < 0):
+            warnings.warn("Some eigenvalues are negative.")
+        self.V = U[:, : self.N] / jnp.sqrt(self.λ[jnp.newaxis, :])
 
         self._fit_inverse_transform(K)
 
