@@ -1,4 +1,5 @@
 from decimal import Decimal
+from sqlite3 import DataError
 import warnings
 import numpy as np
 import jax
@@ -656,6 +657,68 @@ class KernelPCA:
         else:
             return X_t
 
+    def save(self, filename, compression_scheme={}, save_data=False):
+        """Save the PCA fit as hdf5 file.
+
+        Args:
+            filename: name of the file.
+            compression_scheme: dictionary containing compression options,
+                eg. {"compression": "gzip", "compression_opts": 7, "shuffle": True}
+            save_data: bool, either to save the whole data array. If `False`, one
+                needs to provide the data while loading.
+
+        Returns:
+            `None`
+        """
+        datasets = ["K_rows", "K_0", "V", "W", "φ", "λ"]
+        attrs = ["N_dim", "N_samples", "N"]
+        if save_data:
+            datasets.append("data")
+
+        with h5py.File(filename, "w") as f:
+            for attr in attrs:
+                f.attrs[attr] = getattr(self, attr)
+            for k in datasets:
+                f.create_dataset(
+                    k,
+                    data=np.array(getattr(self, k), dtype=np.float32),
+                    **compression_scheme,
+                )
+
+    def load(self, filename, data=None):
+        """Load the PCA fit.
+
+        Args:
+            filename: name of the file.
+            data: data of the model. Needed only if `save_data == False` while saving.
+
+        Returns:
+            `None`
+        """
+        datasets = ["K_rows", "K_0", "V", "W", "φ", "λ"]
+        attrs = ["N_dim", "N_samples", "N"]
+        if data is None:
+            datasets.append("data")
+        else:
+            self.data = data
+
+        with h5py.File(filename, "r") as f:
+            if self.N != f.attrs["N"]:
+                raise ValueError(
+                    "File contains KPCA of order {}, which is different from {}.".format(
+                        f.attrs["N"], self.N
+                    )
+                )
+            for attr in attrs:
+                setattr(self, attr, f.attrs[attr])
+            for k in datasets:
+                setattr(self, k, jnp.array(f[k], dtype=jnp.float32))
+        if (self.N_dim, self.N_samples) != self.data.shape:
+            raise ValueError(
+                f"Data shape is {data.shape}, which differs from saved "
+                f"N_dim, N_samples: {(self.N_dim, self.N_samples)}"
+            )
+
 
 class KernelPCA_m(KernelPCA):
     """Kernel PCA in jax, for CPU + GPU environments.
@@ -743,7 +806,7 @@ class KernelPCA_m(KernelPCA):
             self.vectorized[name] = True
 
     def _fit_inverse_transform(self, K):
-        #         φ = self.transform(self.data)
+        # φ = self.transform(self.data)
         # shortened expression
         self.φ = (self.V * self.λ).T
 
@@ -752,9 +815,9 @@ class KernelPCA_m(KernelPCA):
         else:
             devices = self.devices
 
-        _partial_solve = jax.pmap(
-            jnp.linalg.solve, in_axes=(None, 0), devices=devices, backend="gpu"
-        )
+        # _partial_solve = jax.pmap(
+        #     jnp.linalg.solve, in_axes=(None, 0), devices=devices, backend="gpu"
+        # )
 
         @partial(jax.pmap, in_axes=(None, 0), devices=devices, backend="gpu")
         @jax.jit
@@ -772,10 +835,10 @@ class KernelPCA_m(KernelPCA):
         if self.inverse_kernel is None:
             regularized_K = K + self.α * jnp.eye(K.shape[0])
             regularized_K = jax.device_put(regularized_K, self.devices[0])
-            #             regularized_K_inv = jax.scipy.linalg.pinvh(regularized_K)
+            # regularized_K_inv = jax.scipy.linalg.pinvh(regularized_K)
             S, U = jnp.linalg.eigh(regularized_K)
             regularized_K_inv = jnp.einsum("ik,k,jk->ij", U, 1 / S, U)
-            #             X = jnp.concatenate([jnp.concatenate(_partial_solve(regularized_K, b), axis = 1) for b in B], axis = 1)
+            # X = jnp.concatenate([jnp.concatenate(_partial_solve(regularized_K, b), axis = 1) for b in B], axis = 1)
             X = jnp.concatenate(
                 [
                     jnp.concatenate(_partial_einsum(regularized_K_inv, b), axis=1)
@@ -794,10 +857,10 @@ class KernelPCA_m(KernelPCA):
             )
             regularized_K = K + self.α * jnp.eye(K.shape[0])
             regularized_K = jax.device_put(regularized_K, self.devices[0])
-            #             regularized_K_inv = jax.scipy.linalg.pinvh(regularized_K)
+            # regularized_K_inv = jax.scipy.linalg.pinvh(regularized_K)
             S, U = jnp.linalg.eigh(regularized_K)
             regularized_K_inv = jnp.einsum("ik,k,jk->ij", U, 1 / S, U)
-            #             self.W = jnp.concatenate([jnp.concatenate(_partial_solve(regularized_K, b), axis = 1) for b in B], axis = 1)
+            # self.W = jnp.concatenate([jnp.concatenate(_partial_solve(regularized_K, b), axis = 1) for b in B], axis = 1)
             self.W = jnp.concatenate(
                 [
                     jnp.concatenate(_partial_einsum(regularized_K_inv, b), axis=1)
@@ -919,7 +982,7 @@ class KernelPCA_m(KernelPCA):
             def _partial_einsum(x, y):
                 return jnp.einsum("ij,jk->ki", x, y)
 
-            #             X = jnp.einsum("ij,jk->ki", K, self.W)
+            # X = jnp.einsum("ij,jk->ki", K, self.W)
             W = self.W.reshape(
                 self.N_samples,
                 self.N_dim // len(devices) // self.batch_size_dim,
