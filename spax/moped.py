@@ -25,7 +25,7 @@ class SimpleMOPED:
         N_dim, N_samples = data.shape
         if self.devices is None:
             self.μ = jnp.mean(data, axis=-1)
-            self.var = jnp.var(data, axis=-1)
+            self.var = jnp.var(data, axis=-1, ddof=1)
         else:
             N_devices = len(self.devices)
             batch_size = N_dim // N_devices if batch_size is None else batch_size
@@ -45,7 +45,9 @@ class SimpleMOPED:
             self.var = jnp.array(
                 [
                     jax.pmap(
-                        partial(jnp.var, axis=-1), devices=self.devices, backend="gpu"
+                        partial(jnp.var, axis=-1, ddof=1),
+                        devices=self.devices,
+                        backend="gpu",
                     )(d)
                     for d in data
                 ],
