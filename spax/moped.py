@@ -98,7 +98,7 @@ class SimpleMOPED:
 
             L = jnp.array([logL(d) for d in derivatives]).reshape(N_samples, 2, N_t)
 
-        t = (L[:, 1, :] - L[:, 0, :]) / δθ[:, jnp.newaxis]
+        t = (L[:, 1, :] - L[:, 0, :]) / δθ[jnp.newaxis, :]
         return t
 
     @partial(jax.jit, static_argnums=0)
