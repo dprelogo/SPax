@@ -103,7 +103,7 @@ class SimpleMOPED:
         t = (L[1] - L[0]) / δθ[:, jnp.newaxis]
         return t
 
-    @staticmethod
     @jax.jit
+    @staticmethod
     def logL(x, μ, var):
         return -0.5 * jnp.sum((x - μ) ** 2 / var)
