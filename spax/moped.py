@@ -196,16 +196,18 @@ class SimpleMOPED:
                 jnp.stack([jnp.einsum("i,i", self.δμ[i], b) * b for b in B], axis=0),
                 axis=0,
             )
-            projection_norm = sum([jnp.einsum("i,i", self.δμ[i], b) ** 2 for b in B])
+            projection_norm = jnp.sum(
+                jnp.array([jnp.einsum("i,i", self.δμ[i], b) ** 2 for b in B])
+            )
             vec = var_inv * self.δμ[i] - projection
             vec_norm = jnp.einsum("i,i,i", self.δμ[i], var_inv, self.δμ[i])
-            norm = jnp.sqrt(vec_norm - projection_norm) if normalize else 1.0
+            norm = jnp.sqrt(jnp.abs(vec_norm - projection_norm)) if normalize else 1.0
             B.append((vec - projection) / norm)
 
         self.B = jnp.array(B)
 
     def compute(self, data):
-        """Computing the summary from likelihood gradients.
+        """Computing the summary from eigenvectors.
 
         Args:
             data: array of simulations for which compression should be computed.
