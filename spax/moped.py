@@ -116,7 +116,7 @@ class SimpleMOPED:
     def __init__(self, devices=None):
         self.devices = devices
 
-    def fit(self, data, derivatives, δθ, batch_size=None):
+    def fit(self, data, derivatives, δθ, batch_size=None, normalize=True):
         """Calculating MOPED "eigenvectors" used for compression.
 
         Args:
@@ -127,6 +127,7 @@ class SimpleMOPED:
             δθ: diferential value of each parameter used to build `derivatives`.
             batch_size: split computation in `N_dim // batch_size` steps.
                 `N_dim % (batch_size * N_devices) == 0`
+            normalize: If one should normalize eigenvectors
         """
         N_samples_data, N_dim_data = data.shape
         N_samples_der, _, N_t, N_dim_der = derivatives.shape
@@ -184,11 +185,12 @@ class SimpleMOPED:
 
         B = []
         var_inv = 1 / self.var
-        B.append(
-            var_inv
-            * self.δμ[0]
-            / jnp.sqrt(jnp.einsum("i,i,i", self.δμ[0], var_inv, self.δμ[0]))
+        norm = (
+            jnp.sqrt(jnp.einsum("i,i,i", self.δμ[0], var_inv, self.δμ[0]))
+            if normalize
+            else 1.0
         )
+        B.append(var_inv * self.δμ[0] / norm)
         for i in range(1, N_t):
             projection = jnp.sum(
                 jnp.stack([jnp.einsum("i,i", self.δμ[i], b) * b for b in B], axis=0),
@@ -197,7 +199,8 @@ class SimpleMOPED:
             projection_norm = sum([jnp.einsum("i,i", self.δμ[i], b) ** 2 for b in B])
             vec = var_inv * self.δμ[i] - projection
             vec_norm = jnp.einsum("i,i,i", self.δμ[i], var_inv, self.δμ[i])
-            B.append((vec - projection) / jnp.sqrt(vec_norm - projection_norm))
+            norm = jnp.sqrt(vec_norm - projection_norm) if normalize else 1.0
+            B.append((vec - projection) / norm)
 
         self.B = jnp.array(B)
 
