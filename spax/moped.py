@@ -92,7 +92,7 @@ class SimpleMOPED:
                 N_dim,
             )
 
-            @partial(jax.pmap, devices=self.gpus, backend="gpu")
+            @partial(jax.pmap, devices=self.devices, backend="gpu")
             @jax.vmap
             @jax.vmap
             @jax.vmap
