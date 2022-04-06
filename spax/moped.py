@@ -38,8 +38,7 @@ class SimpleMOPED:
                         partial(jnp.mean, axis=-1), devices=self.devices, backend="gpu"
                     )(d)
                     for d in data
-                ],
-                axis=0,
+                ]
             ).flatten()
 
             self.var = jnp.array(
@@ -50,8 +49,7 @@ class SimpleMOPED:
                         backend="gpu",
                     )(d)
                     for d in data
-                ],
-                axis=0,
+                ]
             ).flatten()
 
     def compute(self, derivatives, δθ, batch_size=None):
