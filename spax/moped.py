@@ -114,7 +114,7 @@ class SimpleMOPED:
     """
 
     def __init__(self, devices=None):
-        self.device = devices
+        self.devices = devices
 
     def fit(self, data, derivatives, δθ, batch_size=None):
         """Calculating MOPED "eigenvectors" used for compression.
