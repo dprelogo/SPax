@@ -210,4 +210,4 @@ class SimpleMOPED:
         Retuns:
             t: summaries, of shape `(..., len(δθ))
         """
-        return jnp.einsum("...i,...ij->...j", data, self.B)
+        return jnp.einsum("...i,...ji->...j", data, self.B)
