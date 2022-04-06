@@ -18,14 +18,14 @@ class SimpleMOPED:
         """Calculating mean and variance from the data.
 
         Args:
-            data: array of simulations at the fiducial parameter value, of shape `(N_dim, N_samples)`.
+            data: array of simulations at the fiducial parameter value, of shape `(N_samples, N_dim)`.
             batch_size: split computation in `N_dim // batch_size` steps.
                 `N_dim % (batch_size * N_devices) == 0`
         """
         N_dim, N_samples = data.shape
         if self.devices is None:
-            self.μ = jnp.mean(data, axis=-1)
-            self.var = jnp.var(data, axis=-1, ddof=1)
+            self.μ = jnp.mean(data, axis=0)
+            self.var = jnp.var(data, axis=0, ddof=1)
         else:
             N_devices = len(self.devices)
             batch_size = N_dim // N_devices if batch_size is None else batch_size
@@ -35,7 +35,7 @@ class SimpleMOPED:
             self.μ = jnp.array(
                 [
                     jax.pmap(
-                        partial(jnp.mean, axis=-1), devices=self.devices, backend="gpu"
+                        partial(jnp.mean, axis=0), devices=self.devices, backend="gpu"
                     )(d)
                     for d in data
                 ]
@@ -44,7 +44,7 @@ class SimpleMOPED:
             self.var = jnp.array(
                 [
                     jax.pmap(
-                        partial(jnp.var, axis=-1, ddof=1),
+                        partial(jnp.var, axis=0, ddof=1),
                         devices=self.devices,
                         backend="gpu",
                     )(d)
@@ -59,19 +59,19 @@ class SimpleMOPED:
             derivatives: array of simulations around fiducial,
                 from which derivatives of the likelihood will be computed.
                 It is important that all 2 * len(δθ) simulations for one sample
-                are calculated with the same "seed". Of shape `(N_dim, 2, len(δθ), N_samples)`
+                are calculated with the same "seed". Of shape `(N_samples, 2, len(δθ), N_dim)`
             δθ: diferential value of each parameter used to build `derivatives`.
             batch_size: split computation in `N_samples // batch_size` steps.
                 `N_dim % (batch_size * N_devices) == 0`
         Retuns:
-            t: summaries, of shape `(len(δθ), N_samples)
+            t: summaries, of shape `(N_samples, len(δθ))
         """
         N_dim, _, N_t, N_samples = derivatives.shape
         if self.devices is None:
 
-            @partial(jax.vmap, in_axes=(1,), out_axes=1)
-            @partial(jax.vmap, in_axes=(1,), out_axes=1)
-            @partial(jax.vmap, in_axes=(1,), out_axes=1)
+            @jax.vmap
+            @jax.vmap
+            @jax.vmap
             def logL(x):
                 return self.logL(x, self.μ, self.var)
 
@@ -80,7 +80,6 @@ class SimpleMOPED:
         else:
             N_devices = len(self.devices)
             batch_size = N_dim // N_devices if batch_size is None else batch_size
-            derivatives = jnp.swapaxes(derivatives, 0, -1)
             derivatives = derivatives.reshape(
                 N_samples // (batch_size * N_devices),
                 N_devices,
@@ -98,9 +97,8 @@ class SimpleMOPED:
                 return self.logL(x, self.μ, self.var)
 
             L = jnp.array([logL(d) for d in derivatives]).reshape(N_samples, 2, N_t)
-            L = jnp.moveaxis(L, 0, -1)
 
-        t = (L[1] - L[0]) / δθ[:, jnp.newaxis]
+        t = (L[:, 1, :] - L[:, 0, :]) / δθ[:, jnp.newaxis]
         return t
 
     @partial(jax.jit, static_argnums=0)
