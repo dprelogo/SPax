@@ -1,5 +1,5 @@
 # SPax
-Signal comPression in [Jax](https://github.com/google/jax). 
+Signal comPression in [JAX](https://github.com/google/jax). 
 
 Supporting both CPU and (multi) GPU operations.
 
@@ -20,7 +20,7 @@ For the GPU support:
 # for CUDA>=11.1 and cuDNN>=8.2
 pip install ".[gpu]" -f https://storage.googleapis.com/jax-releases/jax_releases.html 
 ```
-
+See [JAX installation](https://github.com/google/jax#installation) instructions for other CUDA/cuDNN versions and update JAX accordingly.
 ## Additional flags
 In the case CUDA is not recognized, run as
 ```
