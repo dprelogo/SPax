@@ -1,14 +1,17 @@
-# SPax
-Signal comPression in [JAX](https://github.com/google/jax). 
-
+# SPax: Signal comPression in [JAX](https://github.com/google/jax)
 Supporting both CPU and (multi) GPU operations.
 
-Available algorithms are:
-- Principal Component Analysis
-- Kernel Principal Component Analysis
+
+## Algorithms
+- **Principal Component Analysis**
+  - using eigenvalue decomposition on a covariance/data matrix, reducing the memory footprint
+- **Kernel Principal Component Analysis**
   - flexibility in the inverse transform definition
-- MOPED compression
-- Fisher information calculation
+- **MOPED compression**
+  - (normalized) compression for the Gaussian likelihood, with fixed covariance
+  - generalized MOPED for any likelihood function
+- **Fisher information calculation**
+  - with additional PCA compression for highly dimensional datasets
 
 ## Installation
 For installation on CPU-only machine, clone the repository and install as:
