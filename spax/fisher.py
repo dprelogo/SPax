@@ -17,14 +17,16 @@ class Fisher:
             jax.config.update('jax_platform_name', 'cpu')
             ```
             and pass `jax.devices("gpu")` as devices.
+        full_covariance: To use full covariance model for Fisher or just diagonal.
 
     Methods:
         fit: fitting the data and obtaining covariance matrix and `dμ_dθ`.
         compute: computing the Fisher information matrix, assuming multivariate Gaussian.
     """
 
-    def __init__(self, devices=None):
+    def __init__(self, devices=None, full_covariance=True):
         self.devices = devices
+        self.full_covariance = full_covariance
 
     def fit(self, data, derivatives, δθ, batch_size=None, use_SVD=True):
         """Fitting the data.
@@ -36,17 +38,13 @@ class Fisher:
             batch_size: split computation in `N_dim // batch_size`.
                 `N_dim % batch_size == 0`
             use_SVD: Etiher to use SVD decomposition while computing covariance
-                inverse. See `spax.pca.PCA` for details.
+                inverse or not. See `spax.pca.PCA` for details.
 
         Returns:
             An instance of itself.
         """
         N_dim, N_samples = data.shape
         if self.devices is None:
-            self.pca = PCA()
-            self.pca.fit(data, use_SVD=use_SVD)
-            self.Σ_inv = 1 / self.pca.eigenvalues
-
             dμ_dθ = jnp.mean(
                 (derivatives[:, 1, ...] - derivatives[:, 0, ...])
                 / jnp.reshape(δθ, (1, -1, 1)),
@@ -54,17 +52,20 @@ class Fisher:
                 dtype=jnp.float64,
             ).astype(jnp.float32)
 
-            self.UtJ = jnp.einsum(
-                "ki,kj->ij", self.pca.U, dμ_dθ, precision=jax.lax.Precision.HIGH
-            ).astype(jnp.float32)
+            if self.full_covariance:
+                self.pca = PCA()
+                self.pca.fit(data, use_SVD=use_SVD)
+                self.Σ_inv = 1 / self.pca.eigenvalues
+                self.UtJ = jnp.einsum(
+                    "ki,kj->ij", self.pca.U, dμ_dθ, precision=jax.lax.Precision.HIGH
+                ).astype(jnp.float32)
+            else:
+                var = jnp.var(data, ddof=1, axis=-1)
+                self.Σ_inv = 1 / var
+                self.UtJ = dμ_dθ
         else:
             n_d = len(self.devices)
             batch_size = N_dim // n_d if batch_size is None else batch_size
-            self.pca = PCA_m(devices=self.devices)
-            self.pca.fit(
-                data, batch_size=batch_size, centering_data="GPU", use_SVD=use_SVD
-            )
-            self.Σ_inv = 1 / self.pca.eigenvalues
 
             @partial(jax.pmap, devices=self.devices, backend="gpu")
             @jax.jit
@@ -84,23 +85,36 @@ class Fisher:
                 axis=0,
             )
 
-            @partial(jax.pmap, in_axes=(0, 0), devices=self.devices, backend="gpu")
-            @jax.jit
-            def partial_UtJ(u, j):
-                return jnp.einsum(
-                    "ki,kj->ij", u, j, precision=jax.lax.Precision.HIGH
-                ).astype(jnp.float32)
+            if self.full_covariance:
+                self.pca = PCA_m(devices=self.devices)
+                self.pca.fit(
+                    data, batch_size=batch_size, centering_data="GPU", use_SVD=use_SVD
+                )
+                self.Σ_inv = 1 / self.pca.eigenvalues
 
-            U = self.pca.U.reshape(
-                N_dim // (n_d * batch_size), n_d, batch_size, N_samples
-            )
-            dμ_dθ = dμ_dθ.reshape(N_dim // (n_d * batch_size), n_d, batch_size, len(δθ))
-            self.UtJ = jnp.sum(
-                jnp.array(
-                    [jnp.sum(partial_UtJ(u, j), axis=0) for u, j in zip(U, dμ_dθ)]
-                ),
-                axis=0,
-            ).astype(jnp.float32)
+                @partial(jax.pmap, in_axes=(0, 0), devices=self.devices, backend="gpu")
+                @jax.jit
+                def partial_UtJ(u, j):
+                    return jnp.einsum(
+                        "ki,kj->ij", u, j, precision=jax.lax.Precision.HIGH
+                    ).astype(jnp.float32)
+
+                U = self.pca.U.reshape(
+                    N_dim // (n_d * batch_size), n_d, batch_size, N_samples
+                )
+                dμ_dθ = dμ_dθ.reshape(
+                    N_dim // (n_d * batch_size), n_d, batch_size, len(δθ)
+                )
+                self.UtJ = jnp.sum(
+                    jnp.array(
+                        [jnp.sum(partial_UtJ(u, j), axis=0) for u, j in zip(U, dμ_dθ)]
+                    ),
+                    axis=0,
+                ).astype(jnp.float32)
+            else:
+                var = jnp.var(data, ddof=1, axis=-1)
+                self.Σ_inv = 1 / var
+                self.UtJ = dμ_dθ
 
         return self
 
@@ -120,7 +134,10 @@ class Fisher:
         N = len(self.Σ_inv) if N is None else N
         if N < 1 or N > len(self.Σ_inv):
             raise ValueError(f"N should be between 1 and {len(self.Σ_inv)}.")
-
+        if not self.full_covariance and N != len(self.Σ_inv):
+            raise ValueError(
+                "If only diagonal covariance is used, compression is not needed and not implemented."
+            )
         F = jnp.einsum(
             "ki,k,kj->ij",
             self.UtJ[:N],
