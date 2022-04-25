@@ -1,3 +1,4 @@
+"""PCA compression."""
 from decimal import Decimal
 from sqlite3 import DataError
 import warnings
