@@ -225,7 +225,13 @@ class PCA_m(PCA):
         self.devices = devices
 
     def fit(
-        self, data, batch_size=None, whiten=False, centering_data="CPU", use_SVD=False
+        self,
+        data,
+        batch_size=None,
+        whiten=False,
+        centering_data="CPU",
+        use_SVD=False,
+        decompose_on_CPU=False,
     ):
         """Computing eigenvectors and eigenvalues of the data.
 
@@ -238,6 +244,8 @@ class PCA_m(PCA):
             centering_data (str): either "CPU" or "GPU", where to perform data centering/whitening.
             use_SVD (bool): If true, it uses SVD decomposition, which might be
                 more stable numerically.
+            decompose_on_CPU (bool): If true, it will do a matrix inverse on a CPU.
+                This might be needed for very large matrices.
         Returns:
             An instance of itself.
         """
@@ -318,7 +326,10 @@ class PCA_m(PCA):
                 row_C = jnp.concatenate(row_C, axis=1)
                 C.append(row_C)
             C = jnp.concatenate(C, axis=0)
-            C = jax.device_put(C, self.devices[0])
+            if decompose_on_CPU:
+                C = jax.device_put(C, jax.devices("cpu")[0])
+            else:
+                C = jax.device_put(C, self.devices[0])
             try:
                 C = C.astype(jnp.float64)
             except:
@@ -870,7 +881,14 @@ class KernelPCA_m(KernelPCA):
                 axis=1,
             )
 
-    def fit(self, data, batch_size_samples=None, batch_size_dim=None, use_SVD=False):
+    def fit(
+        self,
+        data,
+        batch_size_samples=None,
+        batch_size_dim=None,
+        use_SVD=False,
+        decompose_on_CPU=False,
+    ):
         """Computing eigenvectors and eigenvalues of the data.
 
         Args:
@@ -881,6 +899,8 @@ class KernelPCA_m(KernelPCA):
                 `N_dim` should be divisible by `batch_size_dim * N_devices`
             use_SVD (bool): If true, it uses SVD decomposition, which might be
                 more stable numerically.
+            decompose_on_CPU (bool): If true, it will do a matrix inverse on a CPU.
+                This might be needed for very large matrices.
 
         Returns:
             An instance of itself.
@@ -906,7 +926,11 @@ class KernelPCA_m(KernelPCA):
             self.batch_size_samples,
             self.batch_size_samples,
         )
-        K = jax.device_put(K, self.devices[0])
+        if decompose_on_CPU:
+            K = jax.device_put(K, jax.devices("cpu")[0])
+        else:
+            K = jax.device_put(K, self.devices[0])
+        # K = jax.device_put(K, self.devices[0])
         K = self._init_kernel_normalization(K)
 
         if use_SVD:
